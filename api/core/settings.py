@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     config_dir: str = "./config"
     data_dir: str = "./data"
     corpus_dir: str = "./corpus"
+    docs_dir: str = Field(
+        default="./docs",
+        description="Directory for uploaded / staged source files (env: DOCS_DIR)",
+    )
 
     admin_token: str = "changeme"
 

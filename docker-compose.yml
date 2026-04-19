@@ -7,7 +7,7 @@ services:
       - "8000:8000"
     volumes:
       - ./corpus:/app/corpus
-      - ./docs:/app/docs:ro
+      - ./docs:/app/docs
       - ./data:/app/data
       - ./config:/app/config
     environment:
@@ -26,6 +26,7 @@ services:
       - CONFIG_DIR=/app/config
       - DATA_DIR=/app/data
       - CORPUS_DIR=/app/corpus
+      - DOCS_DIR=/app/docs
     depends_on:
       qdrant:
         condition: service_started

@@ -17,7 +17,12 @@ embedding:
     batch_size: 32
 
 reranker:
-  active: "cohere"   # cohere | bge | none
+  active: "voyage"   # voyage | cohere | bge | none
+
+  voyage:
+    model: "rerank-2.5"
+    top_n: 5
+    api_base: "https://api.voyageai.com/v1"
 
   cohere:
     model: "rerank-v4.0-pro"

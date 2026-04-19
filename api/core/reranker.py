@@ -1,4 +1,4 @@
-"""Reranker abstraction — Cohere (cloud) / BGE (self-hosted) / None."""
+"""Reranker abstraction — Voyage / Cohere (cloud) / BGE (self-hosted) / None."""
 
 from __future__ import annotations
 
@@ -25,6 +25,46 @@ class Reranker(ABC):
         self, query: str, documents: list[str], top_n: int = 5
     ) -> list[RerankResult]:
         """Return reranked indices + scores, sorted by relevance."""
+
+
+class VoyageReranker(Reranker):
+    """Voyage rerank API (rerank-2.5, etc.)."""
+
+    def __init__(self) -> None:
+        settings = get_settings()
+        cfg = settings.models_config()["reranker"]["voyage"]
+        self.model = cfg["model"]
+        self.api_base = (cfg.get("api_base") or "https://api.voyageai.com/v1").rstrip("/")
+        self.api_key = settings.voyage_api_key
+
+    async def rerank(
+        self, query: str, documents: list[str], top_n: int = 5
+    ) -> list[RerankResult]:
+        if not self.api_key:
+            raise ValueError("VOYAGE_API_KEY is required when reranker.active is voyage")
+        if not documents:
+            return []
+        top_k = min(max(1, top_n), len(documents))
+        async with httpx.AsyncClient(timeout=60) as client:
+            resp = await client.post(
+                f"{self.api_base}/rerank",
+                headers={
+                    "Authorization": f"Bearer {self.api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": self.model,
+                    "query": query,
+                    "documents": documents,
+                    "top_k": top_k,
+                },
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            return [
+                RerankResult(index=r["index"], score=float(r["relevance_score"]))
+                for r in data["data"]
+            ]
 
 
 class CohereReranker(Reranker):
@@ -111,7 +151,9 @@ def get_reranker() -> Reranker:
         settings = get_settings()
         cfg = settings.models_config()
         active = cfg["reranker"]["active"]
-        if active == "cohere":
+        if active == "voyage":
+            _reranker_instance = VoyageReranker()
+        elif active == "cohere":
             _reranker_instance = CohereReranker()
         elif active == "bge":
             _reranker_instance = BGEReranker()

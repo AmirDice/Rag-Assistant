@@ -1,12 +1,19 @@
 """Chat interface with citations, feedback, and optional LLM generation (WP16 §16.2-16.3)."""
 
+import html as html_module
 import os
 import re
-import streamlit as st
+
 import httpx
+import streamlit as st
 from i18n import t, t_list
 from progress_helpers import run_with_progress
-from ui_style import page_heading, render_citation_row
+from ui_style import (
+    clean_source_display_name,
+    inject_global_styles,
+    page_heading,
+    render_citation_row,
+)
 
 API_URL = os.getenv("API_URL", "http://localhost:8000")
 
@@ -16,6 +23,8 @@ _PICTURE_MARKER_RE = re.compile(
     re.IGNORECASE,
 )
 _IMAGE_MD_RE = re.compile(r"!\[[^\]]*\]\(/corpus/[^\)]+\)\n?")
+_MD_BOLD_RE = re.compile(r"\*\*([^*]+)\*\*")
+_MD_HEAD_RE = re.compile(r"^#+\s*", re.MULTILINE)
 
 
 def _clean_chunk_text(text: str) -> str:
@@ -25,36 +34,150 @@ def _clean_chunk_text(text: str) -> str:
     return text.strip()
 
 
+def _snippet_plain(text: str, max_len: int = 380) -> str:
+    """One-line style snippet for source cards (no markdown noise)."""
+    t = _clean_chunk_text(text)
+    t = _MD_HEAD_RE.sub("", t)
+    t = _MD_BOLD_RE.sub(r"\1", t)
+    t = re.sub(r"\s+", " ", t).strip()
+    return (t[:max_len] + "…") if len(t) > max_len else t
+
+
+def _relevance_pct(score: float, top_score: float) -> tuple[int, str, str]:
+    """Percentage vs top chunk + CSS classes for bar and label (match reference tiers)."""
+    sc = float(score)
+    ref = float(top_score) if top_score and top_score > 0 else 0.0
+    if ref > 0:
+        pct = int(max(1, min(100, round(100 * sc / ref))))
+    elif sc <= 1.0:
+        pct = int(max(1, min(100, round(sc * 100))))
+    else:
+        pct = int(max(1, min(100, round(sc))))
+    if pct >= 82:
+        return pct, "", "vk-pct-good"
+    if pct >= 65:
+        return pct, "vk-bar-warn", "vk-pct-warn"
+    return pct, "vk-bar-low", "vk-pct-low"
+
+
+def _widget_key_safe(query_id: str) -> str:
+    return re.sub(r"[^a-zA-Z0-9_]", "_", query_id)[:48] or "q"
+
+
+def _relevance_badge_html(pct: int) -> str:
+    """Rounded badge: Relevance:N with green / yellow / red tier."""
+    inject_global_styles()
+    if pct >= 82:
+        cls = "vk-rel-badge vk-rel-badge--good"
+    elif pct >= 65:
+        cls = "vk-rel-badge vk-rel-badge--ok"
+    else:
+        cls = "vk-rel-badge vk-rel-badge--bad"
+    lab = html_module.escape(t("relevance"))
+    return f'<div class="{cls}">{lab}:{pct}</div>'
+
+
+def _render_secondary_source_card(
+    ch: dict,
+    top_score: float,
+    query_id: str,
+    idx: int,
+) -> None:
+    """Compact card + popover with full chunk text."""
+    score = float(ch.get("score") or 0.0)
+    pct, _, _ = _relevance_pct(score, top_score)
+    doc_raw = str(ch.get("source_doc") or "—")
+    doc_display = clean_source_display_name(doc_raw).replace("`", "'")
+    page = ch.get("source_page")
+    key_base = _widget_key_safe(query_id)
+    with st.container(border=True):
+        inject_global_styles()
+        safe_doc = html_module.escape(doc_display)
+        st.markdown(
+            f'<div class="vk-source-doc-line">'
+            f'<span class="material-symbols-outlined vk-source-doc-line__ic">description</span>'
+            f'<span class="vk-source-doc-title">{safe_doc}</span>'
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+        if page is not None:
+            st.caption(f"p.{page}")
+        st.markdown(_relevance_badge_html(pct), unsafe_allow_html=True)
+        st.caption(_snippet_plain(ch.get("text") or ""))
+        with st.popover(
+            t("show_more"),
+            icon=":material/unfold_more:",
+            width="stretch",
+            key=f"src_{key_base}_{idx}",
+        ):
+            st.markdown(_clean_chunk_text(ch.get("text") or ""))
+            render_citation_row(ch, t("image_badge"))
+            pct_in, _, _ = _relevance_pct(score, top_score)
+            st.markdown(_relevance_badge_html(pct_in), unsafe_allow_html=True)
+
+
+def _render_secondary_sources_row(rest: list[dict], top_score: float, query_id: str) -> None:
+    """Up to 6 cards per horizontal row; each opens a popover for the full passage."""
+    st.markdown(
+        f'<div class="vk-sources-heading">{html_module.escape(t("sources_panel_title"))}</div>',
+        unsafe_allow_html=True,
+    )
+    max_cols = 6
+    n = len(rest)
+    for row_start in range(0, n, max_cols):
+        row = rest[row_start : row_start + max_cols]
+        cols = st.columns(len(row), gap="small")
+        for i, ch in enumerate(row):
+            with cols[i]:
+                _render_secondary_source_card(
+                    ch, top_score, query_id, row_start + i
+                )
+
+
 def render_answer_chunk(chunk: dict, idx: int):
     with st.container():
         text = _clean_chunk_text(chunk["text"])
         st.markdown(text)
 
         render_citation_row(chunk, t("image_badge"))
-        st.markdown(
-            f'<div class="vk-relevance-note">{t("relevance")}: {chunk.get("score", 0):.3f}</div>',
-            unsafe_allow_html=True,
-        )
+        sc = float(chunk.get("score") or 0.0)
+        pct_top, _, _ = _relevance_pct(sc, sc)
+        st.markdown(_relevance_badge_html(pct_top), unsafe_allow_html=True)
 
 
 def render_response(resp: dict):
-    """Render a full response — synthesized answer + source chunks."""
+    """Top chunk (and optional synthesis) first; other chunks as source cards stacked below."""
     if resp.get("cache_hit"):
         st.info(t("cache_hit"), icon=":material/bolt:")
 
-    if resp.get("synthesized_answer"):
-        st.markdown(resp["synthesized_answer"])
-        st.divider()
-        with st.expander(f"{t('source_chunks')} ({len(resp.get('answer_chunks', []))})"):
-            for i, chunk in enumerate(resp.get("answer_chunks", [])):
-                render_answer_chunk(chunk, i)
-                if i < len(resp["answer_chunks"]) - 1:
-                    st.divider()
-    else:
-        for i, chunk in enumerate(resp.get("answer_chunks", [])):
-            render_answer_chunk(chunk, i)
-            if i < len(resp["answer_chunks"]) - 1:
-                st.divider()
+    chunks = resp.get("answer_chunks") or []
+
+    if not chunks:
+        if resp.get("synthesized_answer"):
+            st.markdown(resp["synthesized_answer"])
+        if resp.get("related_docs"):
+            with st.expander(t("see_also")):
+                for rd in resp["related_docs"]:
+                    st.markdown(f"- **{rd['doc']}** — {rd['relevance']}")
+        render_feedback(resp.get("query_id", ""))
+        return
+
+    top = chunks[0]
+    rest = chunks[1:]
+
+    def _main_answer_block():
+        if resp.get("synthesized_answer"):
+            st.markdown(resp["synthesized_answer"])
+            st.divider()
+        render_answer_chunk(top, 0)
+
+    _main_answer_block()
+    if rest:
+        _render_secondary_sources_row(
+            rest,
+            float(top.get("score") or 0.0),
+            str(resp.get("query_id") or "unknown"),
+        )
 
     if resp.get("related_docs"):
         with st.expander(t("see_also")):
@@ -190,4 +313,3 @@ def _chat_body():
 
 
 _chat_body()
-

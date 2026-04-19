@@ -3,9 +3,25 @@
 from __future__ import annotations
 
 import html as html_module
+import re
 from pathlib import Path
 
 import streamlit as st
+
+
+def clean_source_display_name(raw: str) -> str:
+    """Strip upload/hash prefixes; keep the human-readable file name only."""
+    if not raw or not str(raw).strip():
+        return "—"
+    base = Path(str(raw).strip()).name
+    # Ingest upload pattern: 12-char hex + underscore + original filename
+    m = re.match(r"^([a-f0-9]{12})_(.+)$", base, re.I)
+    if m:
+        base = m.group(2)
+    # Numeric stem noise often left before the real title (e.g. 12__1_File.docx)
+    base = re.sub(r"^\d+__\d+_+", "", base)
+    base = re.sub(r"^\d+__\d+__+", "", base)
+    return base.strip() or Path(str(raw).strip()).name
 
 _ROOT = Path(__file__).resolve().parent
 _REPO_ROOT = _ROOT.parent
@@ -51,6 +67,7 @@ def _root_vars(theme: str) -> str:
             --vk-ok: #2dd4bf;
             --vk-bad: #f87171;
             --vk-warn: #fbbf24;
+            --vk-doc-title: #f8fafc;
           }
         """
     return """
@@ -58,6 +75,7 @@ def _root_vars(theme: str) -> str:
         --vk-app-bg: #f8fafc;
         --vk-main-bg: #ffffff;
         --vk-text: #0f172a;
+        --vk-doc-title: #0a0a0a;
         --vk-text-muted: #64748b;
         --vk-border: #e2e8f0;
         --vk-sidebar-bg: #f8fafc;
@@ -190,6 +208,65 @@ def _layout_css() -> str:
             font-size: 0.85rem;
             color: var(--vk-text-muted);
           }
+          .vk-sources-heading {
+            font-size: 0.95rem;
+            font-weight: 600;
+            letter-spacing: 0.02em;
+            color: var(--vk-text);
+            margin: 0 0 0.35rem 0;
+            padding-bottom: 0.35rem;
+            border-bottom: 1px solid var(--vk-border);
+          }
+          .vk-source-doc-line {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.45rem;
+            margin: 0 0 0.15rem 0;
+          }
+          .vk-source-doc-line__ic {
+            font-size: 1.28rem !important;
+            color: var(--vk-text-muted) !important;
+            flex-shrink: 0;
+            margin-top: 0.12rem;
+          }
+          .vk-source-doc-title {
+            font-size: 1.08rem;
+            font-weight: 700;
+            color: var(--vk-doc-title);
+            line-height: 1.35;
+            word-break: break-word;
+          }
+          .vk-citation-docname {
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: var(--vk-doc-title);
+          }
+          .vk-rel-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 12px;
+            padding: 0.38rem 0.65rem;
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+            line-height: 1.15;
+            margin: 0.2rem 0 0.45rem 0;
+            width: fit-content;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12);
+          }
+          .vk-rel-badge--good {
+            background: linear-gradient(145deg, #0d9488, #2dd4bf);
+            color: #ecfdf5;
+          }
+          .vk-rel-badge--ok {
+            background: linear-gradient(145deg, #ca8a04, #facc15);
+            color: #1c1917;
+          }
+          .vk-rel-badge--bad {
+            background: linear-gradient(145deg, #b91c1c, #f87171);
+            color: #fff7f7;
+          }
           .vk-status-ok { color: var(--vk-ok); margin: 0.35rem 0; font-size: 0.95rem; }
           .vk-status-bad { color: var(--vk-bad); margin: 0.35rem 0; font-size: 0.95rem; }
           .vk-key-row {
@@ -207,6 +284,43 @@ def _layout_css() -> str:
           .vk-key-miss { color: var(--vk-warn); }
           div[data-testid="stSpinner"] > div {
             border-color: var(--vk-accent) transparent transparent transparent !important;
+          }
+          /* st.chat_input: do not keep a fixed bar at the viewport bottom — scroll with content */
+          div[data-testid="stBottom"],
+          section[data-testid="stBottom"] {
+            position: static !important;
+            left: auto !important;
+            right: auto !important;
+            top: auto !important;
+            bottom: auto !important;
+            width: 100% !important;
+            max-width: none !important;
+            transform: none !important;
+            z-index: auto !important;
+            background: transparent !important;
+            backdrop-filter: none !important;
+            box-shadow: none !important;
+            border-top: 1px solid var(--vk-border);
+            padding: 0.5rem 0 0.25rem 0;
+            margin-top: 0.5rem;
+          }
+          div[data-testid="stBottom"] > div,
+          section[data-testid="stBottom"] > div {
+            position: static !important;
+          }
+          div[data-testid="stChatFloatingInputContainer"] {
+            position: static !important;
+            bottom: auto !important;
+            left: auto !important;
+            right: auto !important;
+            width: 100% !important;
+            max-width: none !important;
+            z-index: auto !important;
+            background: transparent !important;
+            box-shadow: none !important;
+          }
+          section[data-testid="stMain"] > div {
+            padding-bottom: 0.5rem;
           }
           footer { visibility: hidden; height: 0; }
     """
@@ -269,9 +383,10 @@ def render_citation_row(chunk: dict, image_badge_label: str) -> None:
     inject_global_styles()
     parts: list[str] = []
     if chunk.get("source_doc"):
-        doc = html_module.escape(str(chunk["source_doc"]))
+        doc = html_module.escape(clean_source_display_name(str(chunk["source_doc"])))
         parts.append(
-            f'<span class="material-symbols-outlined">description</span> <strong>{doc}</strong>'
+            f'<span class="material-symbols-outlined">description</span> '
+            f'<strong class="vk-citation-docname">{doc}</strong>'
         )
     if chunk.get("source_page"):
         parts.append(f"p. {html_module.escape(str(chunk['source_page']))}")

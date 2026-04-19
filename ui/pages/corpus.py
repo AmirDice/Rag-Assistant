@@ -31,7 +31,83 @@ page_heading(t("corpus_title"), "folder_open")
 st.caption(t("page_desc_corpus"))
 
 
+def _manual_upload_section():
+    st.subheader(t("upload_title"))
+    st.caption(t("upload_help"))
+    uploaded = st.file_uploader(
+        t("upload_files_label"),
+        type=["pdf", "docx", "pptx", "xlsx"],
+        accept_multiple_files=True,
+        key="corpus_upload_files",
+    )
+    u_col1, u_col2 = st.columns(2)
+    with u_col1:
+        upload_force = st.checkbox(t("ingest_force"), value=False, key="upload_force_cb")
+    with u_col2:
+        upload_workers = st.number_input(
+            t("ingest_workers"),
+            min_value=1,
+            max_value=32,
+            value=4,
+            step=1,
+            key="upload_workers_n",
+        )
+
+    if st.button(
+        t("upload_ingest_btn"),
+        type="primary",
+        disabled=not uploaded,
+        icon=":material/upload:",
+        key="upload_ingest_btn",
+    ):
+        if not uploaded:
+            return
+
+        def _do_upload():
+            parts = []
+            for uf in uploaded:
+                content = uf.getvalue()
+                ctype = uf.type or "application/octet-stream"
+                parts.append(("files", (uf.name, content, ctype)))
+            r = httpx.post(
+                f"{API_URL}/ingest/upload",
+                files=parts,
+                data={
+                    "force": str(upload_force).lower(),
+                    "workers": str(int(upload_workers)),
+                },
+                timeout=300.0,
+            )
+            r.raise_for_status()
+            return r.json()
+
+        try:
+            out = run_with_progress(t("upload_progress"), _do_upload)
+            if out.get("error"):
+                st.error(f"{t('upload_error')}: {out['error']}")
+            else:
+                st.success(
+                    t("upload_started").format(
+                        n=len(out.get("saved") or []),
+                        files=out.get("total_files", 0),
+                    )
+                )
+                time.sleep(1)
+                st.rerun()
+        except httpx.HTTPStatusError as e:
+            detail = ""
+            try:
+                detail = e.response.json().get("detail", str(e))
+            except Exception:
+                detail = e.response.text or str(e)
+            st.error(f"{t('upload_error')}: {detail}")
+        except Exception as ex:
+            st.error(f"{t('upload_error')}: {ex}")
+
+
 def _corpus_body():
+    _manual_upload_section()
+    st.divider()
     try:
         data = run_with_progress(t("page_loading"), _fetch_corpus_bundle)
     except httpx.ConnectError:
