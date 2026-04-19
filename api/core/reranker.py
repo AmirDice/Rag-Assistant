@@ -142,24 +142,26 @@ class NoReranker(Reranker):
         ]
 
 
-_reranker_instance: Reranker | None = None
+_rerankers: dict[str, Reranker] = {}
 
 
-def get_reranker() -> Reranker:
-    global _reranker_instance
-    if _reranker_instance is None:
-        settings = get_settings()
-        cfg = settings.models_config()
-        active = cfg["reranker"]["active"]
-        if active == "voyage":
-            _reranker_instance = VoyageReranker()
-        elif active == "cohere":
-            _reranker_instance = CohereReranker()
-        elif active == "bge":
-            _reranker_instance = BGEReranker()
-        elif active == "none":
-            _reranker_instance = NoReranker()
+def get_reranker(active_override: str | None = None) -> Reranker:
+    """Return reranker for ``active_override`` or, if omitted, ``reranker.active`` from models.yaml."""
+    settings = get_settings()
+    cfg = settings.models_config()
+    raw = (active_override or "").strip().lower() or str(
+        cfg.get("reranker", {}).get("active", "voyage")
+    ).strip().lower()
+    if raw not in _rerankers:
+        if raw == "voyage":
+            _rerankers[raw] = VoyageReranker()
+        elif raw == "cohere":
+            _rerankers[raw] = CohereReranker()
+        elif raw == "bge":
+            _rerankers[raw] = BGEReranker()
+        elif raw == "none":
+            _rerankers[raw] = NoReranker()
         else:
-            raise ValueError(f"Unknown reranker: {active}")
-        logger.info("Reranker initialized: %s", active)
-    return _reranker_instance
+            raise ValueError(f"Unknown reranker: {raw}")
+        logger.info("Reranker ready: %s", raw)
+    return _rerankers[raw]

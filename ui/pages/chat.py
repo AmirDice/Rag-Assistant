@@ -17,6 +17,35 @@ from ui_style import (
 
 API_URL = os.getenv("API_URL", "http://localhost:8000")
 
+# Must match ``api.core.generation_catalog.GENERATION_MODEL_IDS`` (UI cannot import ``api`` in Docker).
+_VALID_UI_GENERATION_MODELS = frozenset({
+    "gemini-2.5-flash-lite",
+    "gemini-2.5-flash",
+    "gpt-4",
+    "gpt-4o-mini",
+})
+
+
+def _ensure_ui_prefs_loaded() -> None:
+    """Load persisted reranker / generation_model from API once per session."""
+    if st.session_state.get("_ui_prefs_loaded"):
+        return
+    try:
+        r = httpx.get(f"{API_URL}/config/ui-preferences", timeout=5)
+        r.raise_for_status()
+        d = r.json()
+        st.session_state["ui_reranker"] = d.get("reranker") or None
+        gm = d.get("generation_model")
+        if isinstance(gm, str):
+            gm = gm.strip() or None
+        if gm not in _VALID_UI_GENERATION_MODELS:
+            gm = None
+        st.session_state["ui_generation_model"] = gm
+    except Exception:
+        st.session_state.setdefault("ui_reranker", None)
+        st.session_state.setdefault("ui_generation_model", None)
+    st.session_state["_ui_prefs_loaded"] = True
+
 
 _PICTURE_MARKER_RE = re.compile(
     r"\*?\*?\s*==>\s*picture\s*\[\d+\s*x\s*\d+\]\s*intentionally omitted\s*<==\s*\*?\*?",
@@ -247,69 +276,96 @@ with st.sidebar:
     st.session_state["tenant_id"] = st.text_input(
         t("tenant_label"), value=st.session_state["tenant_id"]
     )
-    top_k = st.slider(t("results_label"), min_value=1, max_value=10, value=5)
-
-    generate_mode = st.toggle(
-        t("mode_generate"),
-        value=st.session_state.get("generate_mode", False),
-        key="_generate_toggle",
-    )
-    st.session_state["generate_mode"] = generate_mode
 
 
 def _chat_body():
+    """Scrollable history + footer toggle; ``st.chat_input`` is last so it stays page-bottom."""
+    _ensure_ui_prefs_loaded()
+    st.session_state.setdefault("chat_generate_toggle", True)
+
     if "messages" not in st.session_state:
         st.session_state.messages = []
 
-    for msg in st.session_state.messages:
-        with st.chat_message(
-            msg["role"],
-            avatar=":material/person:" if msg["role"] == "user" else ":material/psychology:",
-        ):
-            if msg["role"] == "assistant" and "response" in msg:
-                render_response(msg["response"])
-            else:
-                st.markdown(msg["content"])
+    _CHAT_SCROLL_PX = 560
+    pending = st.session_state.pop("_pending_question", None)
+    # Frozen at send time (same run as ``st.toggle``, before ``st.chat_input``) — avoids reading
+    # generate intent on the *pending* rerun before the toggle widget executes.
+    pending_generate = st.session_state.pop("_pending_generate", None)
 
-    if question := st.chat_input(t("input_placeholder")):
-        st.session_state.messages.append({"role": "user", "content": question})
-        with st.chat_message("user", avatar=":material/person:"):
-            st.markdown(question)
-
-        with st.chat_message("assistant", avatar=":material/psychology:"):
-            label = t("generating") if generate_mode else t("searching")
-
-            def _query():
-                raw = httpx.post(
-                    f"{API_URL}/query",
-                    json={
-                        "question": question,
-                        "tenant_id": st.session_state.get("tenant_id", "demo"),
-                        "top_k": top_k,
-                        "generate": generate_mode,
-                    },
-                    timeout=60,
-                )
-                raw.raise_for_status()
-                return raw.json()
-
-            try:
-                resp = run_with_progress(label, _query)
-                if not resp.get("answer_chunks"):
-                    st.warning(t("no_results"))
+    with st.container(height=_CHAT_SCROLL_PX):
+        for msg in st.session_state.messages:
+            with st.chat_message(
+                msg["role"],
+                avatar=":material/person:" if msg["role"] == "user" else ":material/psychology:",
+            ):
+                if msg["role"] == "assistant" and "response" in msg:
+                    render_response(msg["response"])
                 else:
-                    render_response(resp)
-                st.session_state.messages.append({
-                    "role": "assistant",
-                    "content": "...",
-                    "response": resp,
-                })
-            except httpx.ConnectError:
-                st.error(t("api_error"))
-            except httpx.HTTPStatusError as e:
-                st.error(f"{t('error')}: API returned {e.response.status_code}")
-            except Exception as e:
-                st.error(f"{t('error')}: {e}")
+                    st.markdown(msg["content"])
+
+        if pending is not None:
+            gen = (
+                bool(pending_generate)
+                if pending_generate is not None
+                else False
+            )
+            label = t("generating") if gen else t("searching")
+
+            with st.chat_message("assistant", avatar=":material/psychology:"):
+
+                def _query():
+                    body: dict = {
+                        "question": pending,
+                        "tenant_id": st.session_state.get("tenant_id", "demo"),
+                        "top_k": 5,
+                        "generate": gen,
+                    }
+                    rr = st.session_state.get("ui_reranker")
+                    if rr:
+                        body["reranker"] = rr
+                    gm = st.session_state.get("ui_generation_model")
+                    if gm:
+                        body["generation_model"] = gm
+                    raw = httpx.post(
+                        f"{API_URL}/query",
+                        json=body,
+                        timeout=60,
+                    )
+                    raw.raise_for_status()
+                    return raw.json()
+
+                try:
+                    resp = run_with_progress(label, _query)
+                    if not resp.get("answer_chunks"):
+                        st.warning(t("no_results"))
+                    else:
+                        render_response(resp)
+                    st.session_state.messages.append({
+                        "role": "assistant",
+                        "content": "...",
+                        "response": resp,
+                    })
+                except httpx.ConnectError:
+                    st.error(t("api_error"))
+                except httpx.HTTPStatusError as e:
+                    st.error(f"{t('error')}: API returned {e.response.status_code}")
+                except Exception as e:
+                    st.error(f"{t('error')}: {e}")
+
+    _tog_sp, _tog_col = st.columns([5, 1])
+    with _tog_col:
+        st.toggle(
+            t("mode_generate_short"),
+            key="chat_generate_toggle",
+        )
+
+    if prompt := st.chat_input(t("input_placeholder")):
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        st.session_state["_pending_question"] = prompt
+        st.session_state["_pending_generate"] = bool(
+            st.session_state.get("chat_generate_toggle", True)
+        )
+        st.rerun()
 
 
 _chat_body()

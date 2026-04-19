@@ -5,7 +5,9 @@ from __future__ import annotations
 from typing import Optional
 from uuid import uuid4
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+from api.core.generation_catalog import GENERATION_MODEL_IDS
 
 
 # ── Document metadata (WP12 §12.2) ──────────────────────────
@@ -51,6 +53,37 @@ class QueryRequest(BaseModel):
     top_k: int = Field(default=5, ge=1, le=20)
     lang: Optional[str] = None
     generate: bool = False
+    reranker: Optional[str] = Field(
+        default=None,
+        description="Override reranker: voyage | cohere | bge | none (omit = use config/models.yaml)",
+    )
+    generation_model: Optional[str] = Field(
+        default=None,
+        description="Override generation model id (Gemini or GPT; omit = use YAML / env)",
+    )
+
+    @field_validator("reranker")
+    @classmethod
+    def _norm_reranker(cls, v: Optional[str]) -> Optional[str]:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return None
+        low = v.strip().lower()
+        allowed = {"voyage", "cohere", "bge", "none"}
+        if low not in allowed:
+            raise ValueError(f"reranker must be one of {sorted(allowed)}")
+        return low
+
+    @field_validator("generation_model")
+    @classmethod
+    def _norm_gen(cls, v: Optional[str]) -> Optional[str]:
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return None
+        s = v.strip()
+        if len(s) > 128:
+            raise ValueError("generation_model too long")
+        if s not in GENERATION_MODEL_IDS:
+            raise ValueError(f"generation_model must be one of {list(GENERATION_MODEL_IDS)}")
+        return s
 
 class AnswerChunk(BaseModel):
     text: str

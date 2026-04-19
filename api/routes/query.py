@@ -16,7 +16,14 @@ router = APIRouter()
 async def query_endpoint(req: QueryRequest) -> QueryResponse:
     cache = await get_cache()
 
-    cache_key_suffix = ":gen" if req.generate else ""
+    parts: list[str] = []
+    if req.generate:
+        parts.append("gen")
+    if req.reranker:
+        parts.append(f"rr:{req.reranker}")
+    if req.generation_model:
+        parts.append(f"gm:{req.generation_model}")
+    cache_key_suffix = (":" + ":".join(parts)) if parts else ""
     cached = await cache.get(req.question + cache_key_suffix, req.tenant_id)
     if cached:
         resp = QueryResponse(**cached)
@@ -27,7 +34,9 @@ async def query_endpoint(req: QueryRequest) -> QueryResponse:
 
     if req.generate and resp.answer_chunks:
         resp.synthesized_answer = await generate_answer(
-            req.question, resp.answer_chunks
+            req.question,
+            resp.answer_chunks,
+            generation_model=req.generation_model,
         )
 
     await cache.set(req.question + cache_key_suffix, req.tenant_id, resp.model_dump())

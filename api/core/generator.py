@@ -1,4 +1,4 @@
-"""LLM answer generation — synthesize a natural-language answer from retrieved chunks."""
+"""LLM answer generation — synthesize an answer from retrieved chunks (Gemini or OpenAI)."""
 
 from __future__ import annotations
 
@@ -40,13 +40,55 @@ def _build_context(chunks: list[AnswerChunk]) -> str:
     return "\n\n---\n\n".join(parts)
 
 
-async def generate_answer(question: str, chunks: list[AnswerChunk]) -> str:
-    """Generate a synthesized answer from retrieved chunks (Gemini model from config)."""
-    settings = get_settings()
-    if not settings.google_api_key:
-        logger.warning("GOOGLE_API_KEY not set — skipping generation")
-        return ""
+async def _generate_gemini(
+    settings,
+    model_name: str,
+    system_prompt: str,
+    user_message: str,
+) -> str:
+    from google import genai
 
+    client = genai.Client(api_key=settings.google_api_key)
+    response = await client.aio.models.generate_content(
+        model=model_name,
+        contents=[
+            {"role": "user", "parts": [{"text": system_prompt + "\n\n" + user_message}]},
+        ],
+    )
+    return (response.text or "").strip()
+
+
+async def _generate_openai(
+    settings,
+    model_name: str,
+    system_prompt: str,
+    user_message: str,
+) -> str:
+    from openai import AsyncOpenAI
+
+    client = AsyncOpenAI(api_key=settings.openai_api_key)
+    response = await client.chat.completions.create(
+        model=model_name,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_message},
+        ],
+    )
+    msg = response.choices[0].message
+    return (msg.content or "").strip()
+
+
+async def generate_answer(
+    question: str,
+    chunks: list[AnswerChunk],
+    *,
+    generation_model: str | None = None,
+) -> str:
+    """Synthesize an answer from chunks (Gemini or OpenAI, from arg or YAML/env default)."""
+    from api.core.generation_catalog import uses_openai_api
+    from api.core.model_names import gemini_generation_model
+
+    settings = get_settings()
     if not chunks:
         return ""
 
@@ -55,22 +97,24 @@ async def generate_answer(question: str, chunks: list[AnswerChunk]) -> str:
         f"Fragmentos de documentación:\n\n{context}\n\n"
         f"---\n\nPregunta del usuario: {question}"
     )
+    system_prompt = _system_prompt_es()
+    model_name = (generation_model or "").strip() or gemini_generation_model()
 
     try:
-        from google import genai
-
-        from api.core.model_names import gemini_generation_model
-
-        client = genai.Client(api_key=settings.google_api_key)
-        model_name = gemini_generation_model()
-
-        response = await client.aio.models.generate_content(
-            model=model_name,
-            contents=[
-                {"role": "user", "parts": [{"text": _system_prompt_es() + "\n\n" + user_message}]},
-            ],
-        )
-        answer = response.text.strip()
+        if uses_openai_api(model_name):
+            if not settings.openai_api_key:
+                logger.warning("OPENAI_API_KEY not set — skipping generation")
+                return ""
+            answer = await _generate_openai(
+                settings, model_name, system_prompt, user_message
+            )
+        else:
+            if not settings.google_api_key:
+                logger.warning("GOOGLE_API_KEY not set — skipping generation")
+                return ""
+            answer = await _generate_gemini(
+                settings, model_name, system_prompt, user_message
+            )
         logger.info("Generated answer: %d chars", len(answer))
         return answer
     except Exception as e:

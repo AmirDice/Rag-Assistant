@@ -311,7 +311,7 @@ async def retrieve(request: QueryRequest) -> QueryResponse:
     # Rerank every vector candidate (not a truncated prefix). Previously we used
     # top_n=min(initial_top_k, 15), which dropped the last 5 of 20 hits — correct
     # chunks often sat at 16–20 by embedding score and could never surface.
-    reranker = get_reranker()
+    reranker = get_reranker(request.reranker)
     rerank_top_n = len(texts)
     rerank_results = await reranker.rerank(
         request.question, texts, top_n=rerank_top_n
