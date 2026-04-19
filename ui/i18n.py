@@ -52,6 +52,10 @@ STRINGS = {
         "generated_answer": "Respuesta",
         "source_chunks": "Fragmentos fuente",
         "generating": "Generando respuesta...",
+        "chat_images_heading": "Imágenes",
+        "chat_images_view_all": "Ver ({n})",
+        "chat_image_view_full": "Completo",
+        "chat_image_load_failed": "No se pudo cargar la imagen",
         # Corpus
         "corpus_title": "Corpus",
         "metric_docs": "Documentos",
@@ -279,6 +283,10 @@ STRINGS = {
         "generated_answer": "Answer",
         "source_chunks": "Source chunks",
         "generating": "Generating answer...",
+        "chat_images_heading": "Images",
+        "chat_images_view_all": "All ({n})",
+        "chat_image_view_full": "Full",
+        "chat_image_load_failed": "Could not load image",
         # Corpus
         "corpus_title": "Corpus",
         "metric_docs": "Documents",
@@ -461,18 +469,18 @@ STRINGS = {
 
 
 def init_lang() -> None:
-    """Set default language to Spanish."""
+    """Default UI language is English; Spanish available via session overrides."""
     if "ui_lang" not in st.session_state:
-        st.session_state.ui_lang = "es"
+        st.session_state.ui_lang = "en"
 
 
 def t(key: str) -> str:
     """Return translated string for current language."""
-    lang = st.session_state.get("ui_lang", "es")
-    return STRINGS.get(lang, STRINGS["es"]).get(key, key)
+    lang = st.session_state.get("ui_lang", "en")
+    return STRINGS.get(lang, STRINGS["en"]).get(key, key)
 
 
 def t_list(key: str) -> list[str]:
     """Return translated list for current language."""
-    lang = st.session_state.get("ui_lang", "es")
-    return STRINGS.get(lang, STRINGS["es"]).get(key, [])
+    lang = st.session_state.get("ui_lang", "en")
+    return STRINGS.get(lang, STRINGS["en"]).get(key, [])

@@ -236,6 +236,37 @@ def _layout_css() -> str:
             line-height: 1.35;
             word-break: break-word;
           }
+          /* Chat: secondary “Sources consulted” cards — slightly smaller than main chunk */
+          .vk-source-doc-line--compact {
+            gap: 0.35rem;
+            margin: 0 0 0.1rem 0;
+          }
+          .vk-source-doc-line--compact .vk-source-doc-line__ic {
+            font-size: 1.05rem !important;
+            margin-top: 0.08rem;
+          }
+          .vk-source-doc-line--compact .vk-source-doc-title {
+            font-size: 0.92rem;
+            font-weight: 600;
+            line-height: 1.3;
+            word-break: break-word;
+            overflow-wrap: anywhere;
+            hyphens: auto;
+          }
+          .vk-snippet-compact {
+            font-size: 0.8rem;
+            line-height: 1.42;
+            color: var(--vk-text-muted);
+            margin: 0.12rem 0 0.25rem 0;
+            word-break: break-word;
+            overflow-wrap: anywhere;
+          }
+          .vk-rel-badge--compact {
+            padding: 0.28rem 0.52rem;
+            font-size: 0.65rem;
+            margin: 0.1rem 0 0.25rem 0;
+            border-radius: 9px;
+          }
           .vk-citation-docname {
             font-size: 1.05rem;
             font-weight: 700;
@@ -326,6 +357,55 @@ def _layout_css() -> str:
     """
 
 
+def _chat_images_css() -> str:
+    """Chat gallery: small in-result thumb; popover shows large crisp images."""
+    return """
+          .vk-chat-img-preview-wrap {
+            position: relative;
+            width: 128px;
+            height: 96px;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 1px solid var(--vk-border);
+            background: var(--vk-code-bg);
+          }
+          .vk-chat-img-preview-wrap img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+            filter: none;
+            image-rendering: auto;
+          }
+          .vk-chat-img-preview-wrap.vk-chat-img-preview--many img {
+            opacity: 0.88;
+          }
+          .vk-chat-img-preview-wrap .vk-chat-img-badge {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(15, 23, 42, 0.42);
+            color: #f8fafc;
+            font-weight: 700;
+            font-size: 1.35rem;
+            letter-spacing: 0.02em;
+            pointer-events: none;
+          }
+          div[data-testid="stPopoverBody"]:has([data-testid="stImage"]) [data-testid="stImage"] img,
+          div[data-testid="stPopoverBody"]:has([data-testid="stImage"]) [data-testid="stImage"] picture img {
+            max-width: min(920px, 96vw) !important;
+            max-height: min(78vh, 900px) !important;
+            width: auto !important;
+            height: auto !important;
+            object-fit: contain !important;
+            filter: none !important;
+            image-rendering: auto !important;
+          }
+    """
+
+
 def _logo_css() -> str:
     """st.logo: preserve PNG transparency; 2× height vs Streamlit size=\"large\" (~32px → 64px)."""
     return """
@@ -361,7 +441,7 @@ def inject_global_styles() -> None:
         st.markdown(_FONTS_HTML, unsafe_allow_html=True)
         st.session_state["_vk_fonts_done"] = True
     st.markdown(
-        f"<style>{_root_vars(theme)}{_layout_css()}{_logo_css()}</style>",
+        f"<style>{_root_vars(theme)}{_layout_css()}{_logo_css()}{_chat_images_css()}</style>",
         unsafe_allow_html=True,
     )
 
