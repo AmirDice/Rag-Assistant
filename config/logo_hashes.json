@@ -1,0 +1,30 @@
+{
+  "description": "Perceptual hashes (pHash) of known logos to filter during image extraction. Add new entries as needed — threshold=14 catches scale/compression variants without cross-logo false positives.",
+  "threshold": 14,
+  "logos": [
+    {
+      "name": "consoft",
+      "phash": "a950cf44f2a3b9a9",
+      "reference_file": "logo_ref_consoft.png",
+      "note": "CONSOFT logo, blue/grey text (~197x32)"
+    },
+    {
+      "name": "farmatic",
+      "phash": "ffe47ef0540ca2a0",
+      "reference_file": "logo_ref_farmatic_blue.png",
+      "note": "FARMATIC logo, grey-blue text (~298x49). Also matches white variant at distance 8."
+    },
+    {
+      "name": "partner_logo_gold_pen",
+      "phash": "a8fdd70282f55a61",
+      "reference_file": "logo_ref_0.png",
+      "note": "Partner logo with gold pen motif (300x51 to 404x84)"
+    },
+    {
+      "name": "partner_logo_blue_orange",
+      "phash": "bf2cc0d23f2cc4c3",
+      "reference_file": "logo_ref_6.png",
+      "note": "Partner logo, blue and orange text (~360x117)"
+    }
+  ]
+}

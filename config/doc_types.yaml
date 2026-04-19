@@ -1,0 +1,61 @@
+# Chunking strategy per document type
+# Ref: WP12 / WP13 spec — doc_types.yaml
+
+doc_types:
+  structured_manual:
+    description: "Main structured manuals with chapters (table of contents / headings)"
+    chunk_unit: "section"          # H2/H3 boundary
+    max_tokens: 1500
+    prepend_breadcrumb: true       # "Sección: Cap 3 > Configuración"
+    priority: "high"
+
+  module_manual:
+    description: "Per-module installation/config manuals"
+    chunk_unit: "section"
+    max_tokens: 1500
+    prepend_module_name: true
+    priority: "high"
+
+  operational_guide:
+    description: "Step-by-step procedure documents"
+    chunk_unit: "procedure"        # 1 procedure = 1 chunk
+    max_tokens: 800
+    include_procedure_title: true
+    priority: "high"
+
+  changelog_as_manual:
+    description: "Changelogs that contain functional documentation"
+    chunk_unit: "functional_topic"
+    max_tokens: 1000
+    strip_version_headers: true
+    priority: "medium"
+
+  changelog_pure:
+    description: "Pure version changelogs — low priority"
+    chunk_unit: "single"           # entire doc = 1 chunk
+    max_tokens: 2000
+    priority: "low"
+
+  faq_document:
+    description: "Q&A formatted documents"
+    chunk_unit: "qa_pair"          # 1 Q+A = 1 chunk
+    max_tokens: 600
+    priority: "high"
+
+  technical_spec:
+    description: "Technical specifications and API docs"
+    chunk_unit: "section"
+    max_tokens: 1200
+    priority: "medium"
+
+  training_material:
+    description: "Training slides and presentations"
+    chunk_unit: "slide_group"      # 3-5 slides per chunk
+    max_tokens: 1000
+    priority: "medium"
+
+# Default for unknown types
+default:
+  chunk_unit: "section"
+  max_tokens: 1500
+  priority: "medium"

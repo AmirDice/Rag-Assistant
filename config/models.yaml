@@ -1,0 +1,56 @@
+# Embedding and reranker model configuration
+# Ref: WP15 spec — embedding configs to evaluate
+
+embedding:
+  active: "voyage"   # voyage | qwen3
+
+  voyage:
+    model: "voyage-4-large"
+    dimensions: 1024
+    api_base: "https://api.voyageai.com/v1"
+    batch_size: 128
+
+  qwen3:
+    model: "Qwen/Qwen3-Embedding-8B"
+    dimensions: 1024
+    api_base: "http://localhost:8080/v1"  # local vLLM / SiliconFlow
+    batch_size: 32
+
+reranker:
+  active: "cohere"   # cohere | bge | none
+
+  cohere:
+    model: "rerank-v4.0-pro"
+    top_n: 5
+
+  bge:
+    model: "BAAI/bge-reranker-v2-m3"
+    api_base: "http://localhost:8081/v1"
+    top_n: 5
+
+retrieval:
+  # All of these hits are passed to the reranker (then title boost + per-doc diversity).
+  initial_top_k: 20       # pre-rerank candidates from Qdrant
+  final_top_k: 5           # after reranking
+  score_threshold: 0.3     # minimum similarity for inclusion
+  # Parallel /benchmark/run and /benchmark/analyze (async retrieval, like ingest workers).
+  benchmark_concurrency: 4
+
+# Override any model via env without code changes:
+#   GEMINI_GENERATION_MODEL, GEMINI_VISION_MODEL
+generation:
+  model: "gemini-2.5-flash-lite"
+
+vision:
+  active: "gemini"
+  gemini:
+    model: "gemini-2.5-flash-lite"
+  # Lower cost option: gemini-2.5-flash-lite (see scripts/model_latency_smoke.py)
+  gpt4o_mini:
+    model: "gpt-4o-mini"
+
+cache:
+  mode: "semantic"            # memory | redis | semantic (Tier 3: Redis + embedding similarity)
+  ttl_seconds: 86400       # 24 hours
+  semantic_max_entries: 256
+  semantic_min_similarity: 0.97

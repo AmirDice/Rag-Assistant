@@ -1,0 +1,21 @@
+# Tenant configuration
+# Each tenant maps to one client installation.
+# Use `erp_version` (preferred) or `legacy_erp_version` for document version filtering.
+
+tenants:
+  demo:
+    name: "Demo Tenant"
+    erp_version: 5.0
+    contracted_modules:
+      - "rowa"
+      - "dispensador"
+    has_robot_integration: true
+    preferred_lang: "es"
+
+# Add real tenants here during deployment
+# example_pharmacy:
+#   name: "Farmacia Ejemplo"
+#   erp_version: 4.8
+#   contracted_modules: ["rowa"]
+#   has_robot_integration: false
+#   preferred_lang: "es"

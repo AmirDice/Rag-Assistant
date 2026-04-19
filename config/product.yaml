@@ -1,0 +1,10 @@
+# Product / tenant-facing copy — override per customer deployment (white-label).
+
+product:
+  short_name: "RAG Assistant"
+  # Spanish (RAG answer + vision captions)
+  erp_context_es: "Responde únicamente a partir de la documentación indexada que se te proporcione."
+  reader_role_es: "un usuario profesional"
+  # English (icon-identification prompt)
+  long_name_en: "RAG Assistant"
+  domain_en: "indexed organizational documentation and knowledge"
