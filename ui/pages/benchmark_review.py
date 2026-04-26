@@ -6,7 +6,7 @@ import httpx
 import streamlit as st
 from i18n import t
 from progress_helpers import run_with_progress
-from ui_style import page_heading
+from ui_style import banner, page_heading, section_header
 
 API_URL = os.getenv("API_URL", "http://localhost:8000")
 
@@ -26,9 +26,9 @@ def _post_review(pair_index: int, action: str, edited: str | None, notes: str | 
 
     try:
         run_with_progress(t("page_loading"), _send)
-        st.success(t("review_stored"), icon=":material/save:")
+        banner(t("review_stored"), variant="ok", icon_name="save")
     except Exception as e:
-        st.error(f"{t('error')}: {e}")
+        banner(f"{t('error')}: {e}", variant="error", icon_name="error")
 
 
 page_heading(t("review_title"), "fact_check")
@@ -42,6 +42,7 @@ def _review_body():
     with col_b:
         limit = st.number_input(t("review_limit"), min_value=1, max_value=50, value=5, step=1)
 
+    section_header(t("review_title"), "fact_check")
     if st.button(t("review_load"), icon=":material/folder_open:"):
         off = int(offset)
         lim = int(limit)
@@ -58,7 +59,7 @@ def _review_body():
         try:
             st.session_state["review_batch"] = run_with_progress(t("page_loading"), _load_pairs)
         except Exception as e:
-            st.error(f"{t('error')}: {e}")
+            banner(f"{t('error')}: {e}", variant="error", icon_name="error")
 
     batch = st.session_state.get("review_batch")
     if batch:

@@ -8,7 +8,7 @@ import httpx
 import streamlit as st
 from i18n import t
 from progress_helpers import image_fetch_progress, run_with_progress
-from ui_style import page_heading
+from ui_style import banner, page_heading, section_header
 
 API_URL = os.getenv("API_URL", "http://localhost:8000")
 _MAX_IMAGES = 40
@@ -42,12 +42,12 @@ def _images_body():
     try:
         doc_payload = run_with_progress(t("page_loading"), lambda: _fetch_documents(API_URL))
     except Exception as e:
-        st.error(f"{t('images_load_error')}: {e}")
+        banner(f"{t('images_load_error')}: {e}", variant="error", icon_name="error")
         st.stop()
 
     all_docs = [d for d in doc_payload.get("documents", []) if d.get("media_files")]
     if not all_docs:
-        st.warning(t("images_no_media"))
+        banner(t("images_no_media"), variant="warn", icon_name="warning")
         st.stop()
 
     search = st.text_input(
@@ -59,7 +59,7 @@ def _images_body():
 
     filtered = [d for d in all_docs if _doc_matches(d, search)]
     if not filtered:
-        st.info(t("images_no_match"))
+        banner(t("images_no_match"), variant="info", icon_name="info")
         st.stop()
 
     options = [d["doc_id"] for d in filtered]
@@ -86,7 +86,7 @@ def _images_body():
 
     media = doc.get("media_files") or []
     st.divider()
-    st.subheader(doc.get("source_file") or doc["doc_id"])
+    section_header(doc.get("source_file") or doc["doc_id"], "image")
     st.caption(t("images_n_images").format(n=len(media)))
 
     slice_m = media[:_MAX_IMAGES]

@@ -6,7 +6,7 @@ import httpx
 import streamlit as st
 from i18n import t
 from progress_helpers import run_with_progress
-from ui_style import page_heading
+from ui_style import banner, page_heading, section_header, status_cards
 
 API_URL = os.getenv("API_URL", "http://localhost:8000")
 
@@ -17,6 +17,28 @@ st.caption(t("page_desc_onboarding"))
 def _onboarding_body():
     tenant_id = st.text_input(t("tenant_label"), value="demo")
     admin_token = st.text_input(t("onboarding_admin_token"), type="password", help=t("onboarding_admin_help"))
+    prof = st.session_state.get("tenant_profile")
+
+    status_cards(
+        [
+            {
+                "label": t("onboarding_admin_token"),
+                "state": "on" if bool(admin_token.strip()) else "off",
+                "state_text": t("status_on") if bool(admin_token.strip()) else t("status_off"),
+            },
+            {
+                "label": t("tenant_label"),
+                "state": "on" if bool(tenant_id.strip()) else "off",
+                "state_text": t("status_on") if bool(tenant_id.strip()) else t("status_off"),
+                "hint": tenant_id.strip() or "—",
+            },
+            {
+                "label": t("onboarding_merged"),
+                "state": "on" if bool(prof) else "neutral",
+                "state_text": t("status_on") if bool(prof) else t("status_idle"),
+            },
+        ]
+    )
 
     if st.button(t("onboarding_load"), icon=":material/refresh:"):
         tid = tenant_id
@@ -29,15 +51,14 @@ def _onboarding_body():
         try:
             st.session_state["tenant_profile"] = run_with_progress(t("page_loading"), _load)
         except Exception as e:
-            st.error(f"{t('error')}: {e}")
+            banner(f"{t('error')}: {e}", variant="error", icon_name="error")
 
-    prof = st.session_state.get("tenant_profile")
     if prof:
-        st.subheader(t("onboarding_merged"))
+        section_header(t("onboarding_merged"), "account_tree")
         st.json(prof.get("merged", {}))
 
     st.divider()
-    st.subheader(t("onboarding_update"))
+    section_header(t("onboarding_update"), "edit")
 
     with st.form("onboarding_form"):
         erp_s = st.text_input("erp_version (optional)", placeholder="5.0")
@@ -54,7 +75,7 @@ def _onboarding_body():
             try:
                 payload["erp_version"] = float(erp_s.replace(",", "."))
             except ValueError:
-                st.error(t("onboarding_erp_invalid"))
+                banner(t("onboarding_erp_invalid"), variant="error", icon_name="error")
                 st.stop()
         if modules is not None:
             payload["contracted_modules"] = modules
@@ -76,13 +97,13 @@ def _onboarding_body():
 
         try:
             result = run_with_progress(t("page_loading"), _save)
-            st.success(t("onboarding_saved"))
+            banner(t("onboarding_saved"), variant="ok", icon_name="check_circle")
             st.session_state["tenant_profile"] = result
             st.json(result)
         except Exception as e:
-            st.error(f"{t('error')}: {e}")
+            banner(f"{t('error')}: {e}", variant="error", icon_name="error")
     elif submitted and not admin_token:
-        st.warning(t("onboarding_need_token"))
+        banner(t("onboarding_need_token"), variant="warn", icon_name="warning")
 
 
 _onboarding_body()

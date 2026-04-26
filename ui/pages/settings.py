@@ -1,21 +1,47 @@
 """Settings page — tenant config, model selection, cache (WP16 §16.1)."""
 
 import os
+from pathlib import Path
 
 import httpx
 import streamlit as st
 from i18n import t
 from progress_helpers import run_with_progress
-from ui_style import page_heading, render_api_key_row
+from ui_style import banner, page_heading, section_header, status_cards
 
 API_URL = os.getenv("API_URL", "http://localhost:8000")
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+_DOTENV_PATH = _REPO_ROOT / ".env"
+
+
+def _read_env_file(path: Path) -> dict[str, str]:
+    out: dict[str, str] = {}
+    try:
+        raw = path.read_text(encoding="utf-8")
+    except Exception:
+        return out
+    for line in raw.splitlines():
+        s = line.strip()
+        if not s or s.startswith("#") or "=" not in s:
+            continue
+        key, value = s.split("=", 1)
+        k = key.strip()
+        if not k:
+            continue
+        v = value.strip()
+        if " #" in v:
+            v = v.split(" #", 1)[0].strip()
+        if (v.startswith('"') and v.endswith('"')) or (v.startswith("'") and v.endswith("'")):
+            v = v[1:-1]
+        out[k] = v
+    return out
 
 page_heading(t("settings_title"), "settings")
 st.caption(t("page_desc_settings"))
 
 
 def _settings_body():
-    st.subheader(t("active_config"))
+    section_header(t("active_config"), "monitoring")
 
     try:
 
@@ -23,12 +49,30 @@ def _settings_body():
             return httpx.get(f"{API_URL}/health", timeout=5).json()
 
         health = run_with_progress(t("page_loading"), _health)
-        st.json(health)
+        status_cards(
+            [
+                {
+                    "label": "API",
+                    "state": "on" if str(health.get("api", "")).lower() == "ok" else "off",
+                    "state_text": t("status_ok") if str(health.get("api", "")).lower() == "ok" else t("status_error"),
+                },
+                {
+                    "label": "Qdrant",
+                    "state": "on" if str(health.get("qdrant", "")).lower() == "ok" else "off",
+                    "state_text": t("status_ok") if str(health.get("qdrant", "")).lower() == "ok" else t("status_error"),
+                },
+                {
+                    "label": "Redis",
+                    "state": "on" if str(health.get("redis", "")).lower() == "ok" else "off",
+                    "state_text": t("status_ok") if str(health.get("redis", "")).lower() == "ok" else t("status_error"),
+                },
+            ]
+        )
     except Exception:
-        st.info(t("api_unavailable"))
+        banner(t("api_unavailable"), variant="warn", icon_name="warning")
 
     st.divider()
-    st.subheader(t("tenant_config"))
+    section_header(t("tenant_config"), "domain")
 
     st.markdown(t("tenant_help"))
     st.caption(t("product_config_hint"))
@@ -46,7 +90,7 @@ tenants:
 """, language="yaml")
 
     st.divider()
-    st.subheader(t("models_title"))
+    section_header(t("models_title"), "model_training")
 
     st.markdown("""
 | Component | Cloud | Local |
@@ -57,9 +101,9 @@ tenants:
 | **Generation** | Gemini 2.5 Flash / Lite, GPT-4, GPT-4o mini | — |
 """)
 
-    st.info(t("models_help"))
+    banner(t("models_help"), variant="info", icon_name="info")
 
-    st.subheader(t("prefs_chat_models_title"))
+    section_header(t("prefs_chat_models_title"), "tune")
     st.caption(t("prefs_chat_models_help"))
 
     def _load_model_prefs():
@@ -72,7 +116,7 @@ tenants:
     try:
         model_opts, prefs = run_with_progress(t("page_loading"), _load_model_prefs)
     except Exception:
-        st.warning(t("prefs_load_error"))
+        banner(t("prefs_load_error"), variant="warn", icon_name="warning")
         model_opts, prefs = None, None
 
     if model_opts is not None and prefs is not None:
@@ -135,22 +179,29 @@ tenants:
                 st.session_state["ui_reranker"] = put_body["reranker"]
                 st.session_state["ui_generation_model"] = put_body["generation_model"]
                 st.session_state["_ui_prefs_loaded"] = True
-                st.success(t("prefs_saved"))
+                banner(t("prefs_saved"), variant="ok", icon_name="check_circle")
             except Exception as e:
-                st.error(f"{t('error')}: {e}")
+                banner(f"{t('error')}: {e}", variant="error", icon_name="error")
 
     st.divider()
-    st.subheader(t("api_keys_title"))
+    section_header(t("api_keys_title"), "vpn_key")
 
+    env_file = _read_env_file(_DOTENV_PATH)
     keys = {
-        "VOYAGE_API_KEY": os.getenv("VOYAGE_API_KEY", ""),
-        "COHERE_API_KEY": os.getenv("COHERE_API_KEY", ""),
-        "GOOGLE_API_KEY": os.getenv("GOOGLE_API_KEY", ""),
-        "OPENAI_API_KEY": os.getenv("OPENAI_API_KEY", ""),
+        "VOYAGE_API_KEY": os.getenv("VOYAGE_API_KEY", "") or env_file.get("VOYAGE_API_KEY", ""),
+        "COHERE_API_KEY": os.getenv("COHERE_API_KEY", "") or env_file.get("COHERE_API_KEY", ""),
+        "GOOGLE_API_KEY": os.getenv("GOOGLE_API_KEY", "") or env_file.get("GOOGLE_API_KEY", ""),
+        "OPENAI_API_KEY": os.getenv("OPENAI_API_KEY", "") or env_file.get("OPENAI_API_KEY", ""),
     }
-
-    for name, value in keys.items():
-        render_api_key_row(name, bool(value), t("key_set"), t("key_missing"))
-
+    status_cards(
+        [
+            {
+                "label": name,
+                "state": "on" if bool(value) else "off",
+                "state_text": t("key_set") if bool(value) else t("key_missing"),
+            }
+            for name, value in keys.items()
+        ]
+    )
 
 _settings_body()

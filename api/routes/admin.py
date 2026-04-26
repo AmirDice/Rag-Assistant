@@ -46,6 +46,8 @@ async def health_check() -> HealthResponse:
 @router.get("/stats", response_model=StatsResponse)
 async def stats_endpoint() -> StatsResponse:
     settings = get_settings()
+    docs_dir = Path(settings.docs_dir)
+    corpus_dir = Path(settings.corpus_dir)
 
     qdrant_stats = await get_collection_stats()
     chunks_n = int(qdrant_stats.get("total_chunks", 0) or 0)
@@ -54,10 +56,10 @@ async def stats_endpoint() -> StatsResponse:
     approximate_index_mb = round(vec_bytes * 1.15 / (1024**2), 2)
 
     # Count docs from corpus directory metadata files
-    corpus_dir = Path(settings.corpus_dir)
     by_type: dict[str, int] = {}
     by_module: dict[str, int] = {}
     total_docs = 0
+    total_docs_bytes = 0
     last_ingestion = None
 
     for meta_file in corpus_dir.rglob("metadata.json"):
@@ -68,6 +70,33 @@ async def stats_endpoint() -> StatsResponse:
             by_type[dt] = by_type.get(dt, 0) + 1
             mod = meta.get("module_id") or "core"
             by_module[mod] = by_module.get(mod, 0) + 1
+
+            src_raw = str(meta.get("source_file") or "").strip()
+            candidates: list[Path] = []
+            if src_raw:
+                src_path = Path(src_raw)
+                if src_path.is_absolute():
+                    candidates.append(src_path)
+                candidates.append(docs_dir / src_raw)
+                if src_raw.startswith("/app/docs/"):
+                    candidates.append(docs_dir / src_raw.replace("/app/docs/", "", 1))
+                elif src_raw.startswith("app/docs/"):
+                    candidates.append(docs_dir / src_raw.replace("app/docs/", "", 1))
+            folder_guess = meta_file.parent / src_raw
+            if src_raw:
+                candidates.append(folder_guess)
+
+            seen: set[str] = set()
+            picked_size = 0
+            for candidate in candidates:
+                key = str(candidate.resolve()) if candidate.exists() else str(candidate)
+                if key in seen:
+                    continue
+                seen.add(key)
+                if candidate.exists() and candidate.is_file():
+                    picked_size = int(candidate.stat().st_size)
+                    break
+            total_docs_bytes += picked_size
         except Exception:
             pass
 
@@ -89,6 +118,7 @@ async def stats_endpoint() -> StatsResponse:
         by_module=by_module,
         last_ingestion=last_ingestion,
         approximate_index_mb=approximate_index_mb,
+        total_docs_bytes=total_docs_bytes,
     )
 
 

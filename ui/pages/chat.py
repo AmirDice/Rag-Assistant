@@ -11,6 +11,7 @@ import streamlit as st
 from i18n import t, t_list
 from progress_helpers import run_with_progress
 from ui_style import (
+    banner,
     clean_source_display_name,
     inject_global_styles,
     page_heading,
@@ -635,13 +636,10 @@ def _chat_body():
                     resp = run_with_progress(label, _query)
                     _gal_suf = f"_p{len(st.session_state.messages)}"
                     if not resp.get("answer_chunks"):
-                        st.warning(t("no_results"))
+                        banner(t("no_results"), variant="warn", icon_name="search_off")
                     else:
                         if gen and not (resp.get("synthesized_answer") or "").strip():
-                            st.warning(
-                                "Generation was requested, but no synthesized answer was produced. "
-                                "Showing retrieved source chunks instead."
-                            )
+                            banner(t("generation_fallback_warning"), variant="warn", icon_name="warning")
                         render_response(resp, gallery_key_suffix=_gal_suf)
                     st.session_state.messages.append({
                         "role": "assistant",
@@ -649,11 +647,11 @@ def _chat_body():
                         "response": resp,
                     })
                 except httpx.ConnectError:
-                    st.error(t("api_error"))
+                    banner(t("api_error"), variant="error", icon_name="error")
                 except httpx.HTTPStatusError as e:
-                    st.error(f"{t('error')}: API returned {e.response.status_code}")
+                    banner(f"{t('error')}: API returned {e.response.status_code}", variant="error", icon_name="error")
                 except Exception as e:
-                    st.error(f"{t('error')}: {e}")
+                    banner(f"{t('error')}: {e}", variant="error", icon_name="error")
 
     _tog_sp, _tog_col = st.columns([5, 1])
     with _tog_col:

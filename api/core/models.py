@@ -146,6 +146,7 @@ class StatsResponse(BaseModel):
     by_module: dict[str, int] = {}
     last_ingestion: Optional[str] = None
     approximate_index_mb: float = 0.0
+    total_docs_bytes: int = 0
 
 class HealthResponse(BaseModel):
     api: str = "ok"

@@ -2,14 +2,41 @@
 
 import os
 import time
+from datetime import datetime
+from typing import Any
 
 import httpx
 import streamlit as st
 from i18n import t
 from progress_helpers import run_with_progress
-from ui_style import page_heading, render_health_row
+from ui_style import banner, clean_source_display_name, page_heading, section_header, status_cards
 
 API_URL = os.getenv("API_URL", "http://localhost:8000")
+
+
+def _fmt_bytes(num_bytes: Any) -> str:
+    try:
+        value = float(num_bytes or 0)
+    except Exception:
+        value = 0.0
+    units = ["B", "KB", "MB", "GB", "TB"]
+    idx = 0
+    while value >= 1024 and idx < len(units) - 1:
+        value /= 1024.0
+        idx += 1
+    return f"{value:.2f} {units[idx]}"
+
+
+def _fmt_timestamp(value: Any) -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        return t("never")
+    try:
+        normalized = raw.replace("Z", "+00:00")
+        dt = datetime.fromisoformat(normalized)
+        return dt.strftime("%Y-%m-%d %H:%M")
+    except Exception:
+        return raw[:16]
 
 
 def _fetch_corpus_bundle() -> dict:
@@ -27,12 +54,27 @@ def _fetch_corpus_bundle() -> dict:
     return {"stats": stats, "ingest": ing, "documents": docs}
 
 
+def _summary_table(data: dict[str, int], key_col: str, val_col: str) -> list[dict[str, Any]]:
+    total = max(sum(int(v or 0) for v in data.values()), 1)
+    rows: list[dict[str, Any]] = []
+    for key, count in sorted(data.items(), key=lambda kv: int(kv[1]), reverse=True):
+        n = int(count or 0)
+        rows.append(
+            {
+                key_col: key,
+                val_col: n,
+                "%": f"{(n / total) * 100:.1f}%",
+            }
+        )
+    return rows
+
+
 page_heading(t("corpus_title"), "folder_open")
 st.caption(t("page_desc_corpus"))
 
 
 def _manual_upload_section():
-    st.subheader(t("upload_title"))
+    section_header(t("upload_title"), "upload_file")
     st.caption(t("upload_help"))
     uploaded = st.file_uploader(
         t("upload_files_label"),
@@ -84,13 +126,15 @@ def _manual_upload_section():
         try:
             out = run_with_progress(t("upload_progress"), _do_upload)
             if out.get("error"):
-                st.error(f"{t('upload_error')}: {out['error']}")
+                banner(f"{t('upload_error')}: {out['error']}", variant="error", icon_name="error")
             else:
-                st.success(
+                banner(
                     t("upload_started").format(
                         n=len(out.get("saved") or []),
                         files=out.get("total_files", 0),
-                    )
+                    ),
+                    variant="ok",
+                    icon_name="check_circle",
                 )
                 time.sleep(1)
                 st.rerun()
@@ -100,44 +144,96 @@ def _manual_upload_section():
                 detail = e.response.json().get("detail", str(e))
             except Exception:
                 detail = e.response.text or str(e)
-            st.error(f"{t('upload_error')}: {detail}")
+            banner(f"{t('upload_error')}: {detail}", variant="error", icon_name="error")
         except Exception as ex:
-            st.error(f"{t('upload_error')}: {ex}")
+            banner(f"{t('upload_error')}: {ex}", variant="error", icon_name="error")
 
 
 def _corpus_body():
-    _manual_upload_section()
-    st.divider()
     try:
         data = run_with_progress(t("page_loading"), _fetch_corpus_bundle)
     except httpx.ConnectError:
-        st.error(t("api_unreachable"))
+        banner(t("api_unreachable"), variant="error", icon_name="error")
         return
     except Exception as e:
-        st.error(f"{t('stats_error')}: {e}")
+        banner(f"{t('stats_error')}: {e}", variant="error", icon_name="error")
         return
 
     stats = data["stats"]
+    ingest_status = data.get("ingest") or {}
 
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric(t("metric_docs"), stats.get("total_docs", 0))
-    col2.metric(t("metric_chunks"), stats.get("total_chunks", 0))
+    ingest_state = str(ingest_status.get("status") or "").lower()
+    if ingest_state == "running":
+        ingest_state_label = t("status_running")
+        ingest_state_kind = "on"
+    elif ingest_state == "paused":
+        ingest_state_label = t("status_paused")
+        ingest_state_kind = "off"
+    else:
+        ingest_state_label = t("status_idle")
+        ingest_state_kind = "neutral"
+
     last = stats.get("last_ingestion")
-    col3.metric(t("metric_last"), last[:19] if last else t("never"))
-    idx_mb = stats.get("approximate_index_mb") or 0
-    col4.metric(t("metric_index_mb"), f"{float(idx_mb):.2f}")
+    total_docs = int(stats.get("total_docs", 0) or 0)
+    total_chunks = int(stats.get("total_chunks", 0) or 0)
+    total_size_bytes = int(stats.get("total_docs_bytes", 0) or 0)
 
-    if stats.get("by_type"):
-        st.subheader(t("by_type"))
-        for dtype, count in sorted(stats["by_type"].items()):
-            st.progress(count / max(stats["by_type"].values(), default=1), text=f"{dtype}: {count}")
+    status_cards(
+        [
+            {
+                "label": t("ingest_title"),
+                "show_state": False,
+                "value": ingest_state_label,
+                "hint": f"{ingest_status.get('processed', 0)} {t('metric_docs').lower()}",
+            },
+            {
+                "label": t("metric_docs"),
+                "show_state": False,
+                "value": str(total_docs),
+            },
+            {
+                "label": t("metric_chunks"),
+                "show_state": False,
+                "value": str(total_chunks),
+            },
+            {
+                "label": t("metric_last"),
+                "show_state": False,
+                "value": _fmt_timestamp(last),
+            },
+            {
+                "label": t("metric_docs_size"),
+                "show_state": False,
+                "value": _fmt_bytes(total_size_bytes),
+            },
+        ]
+    )
 
-    if stats.get("by_module"):
-        st.subheader(t("by_module"))
-        for mod, count in sorted(stats["by_module"].items()):
-            st.markdown(f"- **{mod}**: {count} {t('docs_suffix')}")
+    summary_left, summary_right = st.columns(2)
+    with summary_left:
+        section_header(t("by_type"), "category")
+        by_type = stats.get("by_type") or {}
+        if by_type:
+            st.dataframe(
+                _summary_table(by_type, "type", t("metric_docs")),
+                hide_index=True,
+                use_container_width=True,
+            )
+        else:
+            banner(t("documents_empty"), variant="info", icon_name="info")
+    with summary_right:
+        section_header(t("by_module"), "grid_view")
+        by_module = stats.get("by_module") or {}
+        if by_module:
+            st.dataframe(
+                _summary_table(by_module, "module", t("metric_docs")),
+                hide_index=True,
+                use_container_width=True,
+            )
+        else:
+            banner(t("documents_empty"), variant="info", icon_name="info")
 
-    st.subheader(t("documents_list_title"))
+    section_header(t("documents_list_title"), "list")
     doc_payload = data.get("documents")
     if doc_payload is not None:
         try:
@@ -147,7 +243,7 @@ def _corpus_body():
                     [
                         {
                             "doc_id": r.get("doc_id"),
-                            "source_file": r.get("source_file"),
+                            "source_file": clean_source_display_name(str(r.get("source_file") or "")),
                             "doc_type": r.get("doc_type"),
                             "module_id": r.get("module_id"),
                             "images": r.get("image_count", 0),
@@ -188,16 +284,16 @@ def _corpus_body():
                     except Exception as ex:
                         st.error(str(ex))
             else:
-                st.info(t("documents_empty"))
+                banner(t("documents_empty"), variant="info", icon_name="info")
         except Exception as ex:
-            st.warning(f"{t('documents_list_error')}: {ex}")
+            banner(f"{t('documents_list_error')}: {ex}", variant="warn", icon_name="warning")
     else:
-        st.warning(t("documents_list_error"))
+        banner(t("documents_list_error"), variant="warn", icon_name="warning")
 
     st.divider()
-    st.subheader(t("ingest_title"))
-
-    ingest_status = data.get("ingest")
+    _manual_upload_section()
+    st.divider()
+    section_header(t("ingest_title"), "dataset")
 
     active = ingest_status and ingest_status.get("status") in ("running", "paused")
 
@@ -315,9 +411,9 @@ def _corpus_body():
             if proc > 0 or ch > 0 or fc > 0:
                 msg = t("ingest_bg_completed") + f" — {proc} docs, {ch} chunks"
                 if fc:
-                    st.warning(msg + f" · {fc} {t('ingest_failed_list').lower()}")
+                    banner(msg + f" · {fc} {t('ingest_failed_list').lower()}", variant="warn", icon_name="warning")
                 else:
-                    st.success(msg)
+                    banner(msg, variant="ok", icon_name="check_circle")
 
         can_resume = bool(ingest_status and ingest_status.get("can_resume"))
         resume_only = st.checkbox(t("ingest_resume_cb"), value=False, disabled=not can_resume)
@@ -365,7 +461,7 @@ def _corpus_body():
                         time.sleep(1)
                         st.rerun()
                 except Exception as e:
-                    st.error(f"{t('ingest_error')}: {e}")
+                    banner(f"{t('ingest_error')}: {e}", variant="error", icon_name="error")
         with col_b:
             if can_resume and st.button(t("ingest_resume_btn"), type="secondary", disabled=False):
                 def _resume():
@@ -386,10 +482,10 @@ def _corpus_body():
                         time.sleep(1)
                         st.rerun()
                 except Exception as e:
-                    st.error(f"{t('ingest_error')}: {e}")
+                    banner(f"{t('ingest_error')}: {e}", variant="error", icon_name="error")
 
     st.divider()
-    st.subheader(t("health_title"))
+    section_header(t("health_title"), "health_and_safety")
 
     if st.button(t("health_check")):
         def _health():
@@ -397,10 +493,18 @@ def _corpus_body():
 
         try:
             health = run_with_progress(t("page_loading"), _health)
-            for service, status in health.items():
-                render_health_row(service, status)
+            status_cards(
+                [
+                    {
+                        "label": str(service).upper(),
+                        "state": "on" if str(status).lower() == "ok" else "off",
+                        "state_text": t("status_ok") if str(status).lower() == "ok" else t("status_error"),
+                    }
+                    for service, status in health.items()
+                ]
+            )
         except Exception as e:
-            st.error(f"{t('error')}: {e}")
+            banner(f"{t('error')}: {e}", variant="error", icon_name="error")
 
 
 _corpus_body()

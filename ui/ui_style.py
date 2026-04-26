@@ -68,6 +68,16 @@ def _root_vars(theme: str) -> str:
             --vk-bad: #f87171;
             --vk-warn: #fbbf24;
             --vk-doc-title: #f8fafc;
+            --vk-card-bg: #172033;
+            --vk-card-bg-soft: #131b2b;
+            --vk-shadow: 0 8px 28px rgba(2, 6, 23, 0.45);
+            --vk-focus: #38bdf8;
+            --vk-radius: 12px;
+            --vk-space-1: 0.35rem;
+            --vk-space-2: 0.55rem;
+            --vk-space-3: 0.85rem;
+            --vk-space-4: 1.15rem;
+            --vk-space-5: 1.5rem;
           }
         """
     return """
@@ -85,6 +95,16 @@ def _root_vars(theme: str) -> str:
         --vk-ok: #0d9488;
         --vk-bad: #b91c1c;
         --vk-warn: #ca8a04;
+        --vk-card-bg: #ffffff;
+        --vk-card-bg-soft: #f8fafc;
+        --vk-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+        --vk-focus: #0ea5e9;
+        --vk-radius: 12px;
+        --vk-space-1: 0.35rem;
+        --vk-space-2: 0.55rem;
+        --vk-space-3: 0.85rem;
+        --vk-space-4: 1.15rem;
+        --vk-space-5: 1.5rem;
       }
     """
 
@@ -141,13 +161,15 @@ def _layout_css() -> str:
             color: var(--vk-text) !important;
           }
           [data-testid="stExpander"] {
-            background-color: var(--vk-main-bg) !important;
+            background-color: var(--vk-card-bg) !important;
             border: 1px solid var(--vk-border) !important;
-            border-radius: 8px !important;
+            border-radius: var(--vk-radius) !important;
+            box-shadow: var(--vk-shadow);
           }
           [data-testid="stDataFrame"] {
             border: 1px solid var(--vk-border) !important;
-            border-radius: 8px !important;
+            border-radius: var(--vk-radius) !important;
+            overflow: hidden;
           }
           .stButton > button[kind="primary"] {
             background-color: var(--vk-accent) !important;
@@ -174,7 +196,7 @@ def _layout_css() -> str:
             display: flex;
             align-items: center;
             gap: 0.65rem;
-            margin: 0 0 0.25rem 0;
+            margin: 0 0 0.35rem 0;
             padding: 0;
           }
           .vk-page-head__icon {
@@ -183,7 +205,7 @@ def _layout_css() -> str:
             font-weight: 300 !important;
           }
           .vk-page-head__title {
-            font-size: 1.6rem;
+            font-size: 1.72rem;
             font-weight: 600;
             margin: 0;
             padding: 0;
@@ -209,7 +231,7 @@ def _layout_css() -> str:
             color: var(--vk-text-muted);
           }
           .vk-sources-heading {
-            font-size: 0.95rem;
+            font-size: 1rem;
             font-weight: 600;
             letter-spacing: 0.02em;
             color: var(--vk-text);
@@ -313,6 +335,143 @@ def _layout_css() -> str:
           }
           .vk-key-ok { color: var(--vk-ok); }
           .vk-key-miss { color: var(--vk-warn); }
+          .vk-section {
+            margin: var(--vk-space-4) 0 var(--vk-space-3);
+            padding-bottom: var(--vk-space-2);
+            border-bottom: 1px solid var(--vk-border);
+          }
+          .vk-section__title {
+            display: flex;
+            align-items: center;
+            gap: 0.45rem;
+            font-size: 1.08rem;
+            font-weight: 700;
+            margin: 0;
+            color: var(--vk-text);
+          }
+          .vk-section__title .material-symbols-outlined {
+            font-size: 1.1rem !important;
+            color: var(--vk-text-muted) !important;
+          }
+          .vk-section__caption {
+            margin-top: var(--vk-space-1);
+            color: var(--vk-text-muted);
+            font-size: 0.92rem;
+          }
+          .vk-kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: var(--vk-space-3);
+            margin: var(--vk-space-3) 0;
+          }
+          .vk-kpi-card {
+            border: 1px solid var(--vk-border);
+            border-radius: var(--vk-radius);
+            padding: var(--vk-space-3);
+            background: var(--vk-card-bg);
+            box-shadow: var(--vk-shadow);
+          }
+          .vk-kpi-card__label {
+            color: var(--vk-text-muted);
+            font-size: 0.8rem;
+            margin-bottom: var(--vk-space-1);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+          }
+          .vk-kpi-card__value {
+            color: var(--vk-text);
+            font-size: 1.4rem;
+            font-weight: 700;
+            line-height: 1.1;
+          }
+          .vk-status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+            gap: var(--vk-space-3);
+            margin: var(--vk-space-3) 0;
+          }
+          .vk-status-card {
+            border: 1px solid var(--vk-border);
+            border-radius: var(--vk-radius);
+            padding: var(--vk-space-3);
+            background: var(--vk-card-bg);
+            box-shadow: var(--vk-shadow);
+          }
+          .vk-status-card__label {
+            font-size: 0.82rem;
+            color: var(--vk-text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            margin-bottom: var(--vk-space-2);
+          }
+          .vk-status-card__state {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            padding: 0.2rem 0.55rem;
+            border-radius: 999px;
+            font-size: 0.76rem;
+            font-weight: 700;
+            letter-spacing: 0.03em;
+            text-transform: uppercase;
+          }
+          .vk-status-card__state .material-symbols-outlined {
+            font-size: 0.95rem !important;
+          }
+          .vk-status-card__state--on {
+            background: color-mix(in srgb, var(--vk-ok) 20%, transparent);
+            color: var(--vk-ok);
+            border: 1px solid color-mix(in srgb, var(--vk-ok) 40%, transparent);
+          }
+          .vk-status-card__state--off {
+            background: color-mix(in srgb, var(--vk-bad) 20%, transparent);
+            color: var(--vk-bad);
+            border: 1px solid color-mix(in srgb, var(--vk-bad) 40%, transparent);
+          }
+          .vk-status-card__state--neutral {
+            background: color-mix(in srgb, var(--vk-warn) 20%, transparent);
+            color: var(--vk-warn);
+            border: 1px solid color-mix(in srgb, var(--vk-warn) 40%, transparent);
+          }
+          .vk-status-card__hint {
+            margin-top: var(--vk-space-2);
+            font-size: 0.86rem;
+            color: var(--vk-text);
+            opacity: 0.95;
+          }
+          .vk-status-card__value {
+            margin-top: var(--vk-space-1);
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--vk-text);
+            line-height: 1.2;
+          }
+          .vk-panel {
+            border: 1px solid var(--vk-border);
+            border-radius: var(--vk-radius);
+            padding: var(--vk-space-4);
+            background: var(--vk-card-bg);
+            box-shadow: var(--vk-shadow);
+          }
+          .vk-banner {
+            border-radius: var(--vk-radius);
+            border: 1px solid var(--vk-border);
+            padding: var(--vk-space-2) var(--vk-space-3);
+            margin: var(--vk-space-2) 0;
+            display: flex;
+            align-items: center;
+            gap: var(--vk-space-2);
+            font-size: 0.94rem;
+          }
+          .vk-banner .material-symbols-outlined { font-size: 1.1rem !important; }
+          .vk-banner--info { background: color-mix(in srgb, var(--vk-focus) 14%, transparent); color: var(--vk-text); }
+          .vk-banner--ok { background: color-mix(in srgb, var(--vk-ok) 15%, transparent); color: var(--vk-text); }
+          .vk-banner--warn { background: color-mix(in srgb, var(--vk-warn) 15%, transparent); color: var(--vk-text); }
+          .vk-banner--error { background: color-mix(in srgb, var(--vk-bad) 15%, transparent); color: var(--vk-text); }
+          button:focus, input:focus, textarea:focus, select:focus {
+            outline: 2px solid var(--vk-focus) !important;
+            outline-offset: 1px !important;
+          }
           div[data-testid="stSpinner"] > div {
             border-color: var(--vk-accent) transparent transparent transparent !important;
           }
@@ -437,9 +596,9 @@ def inject_global_styles() -> None:
     theme = st.session_state.get("ui_theme", "light")
     if theme not in ("light", "dark"):
         theme = "light"
-    if not st.session_state.get("_vk_fonts_done"):
-        st.markdown(_FONTS_HTML, unsafe_allow_html=True)
-        st.session_state["_vk_fonts_done"] = True
+    # Keep injecting font links on reruns to avoid first-load race conditions
+    # where Material Symbols may not be available until a manual refresh.
+    st.markdown(_FONTS_HTML, unsafe_allow_html=True)
     st.markdown(
         f"<style>{_root_vars(theme)}{_layout_css()}{_logo_css()}{_chat_images_css()}</style>",
         unsafe_allow_html=True,
@@ -511,3 +670,60 @@ def render_api_key_row(name: str, configured: bool, label_ok: str, label_miss: s
         f"<span><strong>{nm}</strong> — {lb}</span></div>",
         unsafe_allow_html=True,
     )
+
+
+def section_header(title: str, icon_name: str = "tune", caption: str | None = None) -> None:
+    inject_global_styles()
+    t = html_module.escape(title)
+    i = html_module.escape(icon_name)
+    c = html_module.escape(caption) if caption else ""
+    cap_html = f'<div class="vk-section__caption">{c}</div>' if caption else ""
+    st.markdown(
+        f'<div class="vk-section"><div class="vk-section__title">'
+        f'<span class="material-symbols-outlined">{i}</span>{t}</div>{cap_html}</div>',
+        unsafe_allow_html=True,
+    )
+
+
+def banner(message: str, variant: str = "info", icon_name: str = "info") -> None:
+    inject_global_styles()
+    m = html_module.escape(message)
+    v = variant if variant in {"info", "ok", "warn", "error"} else "info"
+    i = html_module.escape(icon_name)
+    st.markdown(
+        f'<div class="vk-banner vk-banner--{v}"><span class="material-symbols-outlined">{i}</span>{m}</div>',
+        unsafe_allow_html=True,
+    )
+
+
+def status_cards(items: list[dict]) -> None:
+    """Render top-of-page on/off/configuration cards."""
+    inject_global_styles()
+    cards: list[str] = []
+    for item in items:
+        label = html_module.escape(str(item.get("label", "")))
+        state_raw = str(item.get("state", "neutral")).lower().strip()
+        state = state_raw if state_raw in {"on", "off", "neutral"} else "neutral"
+        state_text = html_module.escape(str(item.get("state_text") or state.upper()))
+        show_state = bool(item.get("show_state", True))
+        value = str(item.get("value") or "").strip()
+        hint = str(item.get("hint") or "").strip()
+        value_html = f'<div class="vk-status-card__value">{html_module.escape(value)}</div>' if value else ""
+        hint_html = f'<div class="vk-status-card__hint">{html_module.escape(hint)}</div>' if hint else ""
+        icon = "check_circle" if state == "on" else ("cancel" if state == "off" else "help")
+        state_html = (
+            f'<div class="vk-status-card__state vk-status-card__state--{state}">'
+            f'<span class="material-symbols-outlined">{icon}</span>{state_text}</div>'
+            if show_state
+            else ""
+        )
+        cards.append(
+            '<div class="vk-status-card">'
+            f'<div class="vk-status-card__label">{label}</div>'
+            f"{state_html}"
+            f"{value_html}"
+            f"{hint_html}</div>"
+        )
+    if not cards:
+        return
+    st.markdown(f'<div class="vk-status-grid">{"".join(cards)}</div>', unsafe_allow_html=True)

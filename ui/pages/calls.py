@@ -11,7 +11,7 @@ import streamlit as st
 
 from i18n import t
 from progress_helpers import run_with_progress
-from ui_style import page_heading
+from ui_style import banner, page_heading, section_header, status_cards
 
 API_URL = os.getenv("API_URL", "http://localhost:8000")
 
@@ -93,7 +93,7 @@ with st.sidebar:
 
 agent_id = st.session_state.get("calls_agent_id", "call_audio")
 
-st.subheader(t("calls_upload"))
+section_header(t("calls_upload"), "upload_file")
 up_cols = st.columns([3, 1])
 with up_cols[0]:
     up = st.file_uploader(
@@ -108,15 +108,15 @@ with up_cols[1]:
             started = run_with_progress(t("calls_upload_progress"), lambda: _upload_audio(up, agent_id))
             job = run_with_progress(t("calls_job_progress"), lambda: _poll_job(started["job_id"], agent_id))
             if job.get("status") == "completed":
-                st.success(t("calls_job_done").format(n=job.get("calls_created", 0)))
+                banner(t("calls_job_done").format(n=job.get("calls_created", 0)), variant="ok", icon_name="check_circle")
             else:
-                st.error(t("calls_job_failed").format(err=job.get("error", "unknown error")))
+                banner(t("calls_job_failed").format(err=job.get("error", "unknown error")), variant="error", icon_name="error")
             st.rerun()
         except Exception as e:
-            st.error(f"{t('error')}: {e}")
+            banner(f"{t('error')}: {e}", variant="error", icon_name="error")
 
 st.divider()
-st.subheader(t("calls_library"))
+section_header(t("calls_library"), "library_books")
 
 f1, f2, f3 = st.columns(3)
 with f1:
@@ -132,12 +132,35 @@ try:
         lambda: _fetch_calls_bundle(agent_id, search_q, farmacia_q, "", resolved_q),
     )
 except Exception as e:
-    st.error(f"{t('error')}: {e}")
+    banner(f"{t('error')}: {e}", variant="error", icon_name="error")
     st.stop()
 
 stats = bundle.get("stats") or {}
 calls_payload = bundle.get("calls") or {}
 calls = calls_payload.get("calls") or []
+
+status_cards(
+    [
+        {
+            "label": t("calls_agent_id"),
+            "state": "on" if bool(agent_id.strip()) else "off",
+            "state_text": t("status_on") if bool(agent_id.strip()) else t("status_off"),
+            "hint": agent_id.strip() or "—",
+        },
+        {
+            "label": t("calls_metric_total"),
+            "state": "on" if int(stats.get("total", 0) or 0) > 0 else "off",
+            "state_text": t("status_on") if int(stats.get("total", 0) or 0) > 0 else t("status_off"),
+            "hint": str(int(stats.get("total", 0) or 0)),
+        },
+        {
+            "label": t("calls_resolved"),
+            "state": "on" if int(stats.get("resolved", 0) or 0) > 0 else "neutral",
+            "state_text": t("status_on") if int(stats.get("resolved", 0) or 0) > 0 else t("status_idle"),
+            "hint": f"{int(stats.get('resolved', 0) or 0)} / {int(stats.get('total', 0) or 0)}",
+        },
+    ]
+)
 
 s1, s2, s3 = st.columns(3)
 s1.metric(t("calls_metric_total"), int(stats.get("total", 0) or 0))
@@ -145,7 +168,7 @@ s2.metric(t("calls_metric_resolved"), int(stats.get("resolved", 0) or 0))
 s3.metric(t("calls_metric_last"), (stats.get("last_indexed_at") or "")[:19] or t("never"))
 
 if not calls:
-    st.info(t("calls_empty"))
+    banner(t("calls_empty"), variant="info", icon_name="info")
     st.stop()
 
 rows = [
@@ -169,7 +192,7 @@ selected_id = st.selectbox(
 
 detail = run_with_progress(t("page_loading"), lambda: _load_call_detail(selected_id))
 
-st.subheader(t("calls_detail"))
+section_header(t("calls_detail"), "description")
 st.markdown(f"**{t('calls_problem')}**: {detail.get('problema_corto') or '—'}")
 st.markdown(f"**{t('calls_summary')}**: {detail.get('resumen') or '—'}")
 st.markdown(f"**{t('calls_resolution')}**: {detail.get('resolucion') or '—'}")
@@ -195,7 +218,7 @@ with st.expander(t("calls_rag_pairs"), expanded=False):
 if st.button(t("calls_delete_btn"), type="secondary"):
     try:
         run_with_progress(t("calls_delete_progress"), lambda: _delete_call(selected_id))
-        st.success(t("calls_deleted"))
+        banner(t("calls_deleted"), variant="ok", icon_name="delete")
         st.rerun()
     except Exception as e:
-        st.error(f"{t('error')}: {e}")
+        banner(f"{t('error')}: {e}", variant="error", icon_name="error")
