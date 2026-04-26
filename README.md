@@ -1,9 +1,3 @@
-# RAG Assistant
-
-Retrieval-augmented Q&A over your organization’s indexed documentation. Ships with a REST API and Streamlit UI; white-label product copy lives in `config/product.yaml`.
-
-This repository is **source code only**. Do not commit customer PDFs, specs, or internal notes: use a local `./docs` folder (gitignored) and mount it in Docker as in `docker-compose.yml`.
-
 ## Quick Start
 
 ```bash
