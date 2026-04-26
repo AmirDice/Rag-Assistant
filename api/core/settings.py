@@ -27,6 +27,26 @@ class Settings(BaseSettings):
     )
 
     admin_token: str = "changeme"
+    enforce_admin_auth: bool = Field(
+        default=False,
+        description="Require X-Admin-Token on protected API routes (env: ENFORCE_ADMIN_AUTH)",
+    )
+    rate_limit_enabled: bool = Field(
+        default=True,
+        description="Enable in-memory API rate limiting middleware (env: RATE_LIMIT_ENABLED)",
+    )
+    rate_limit_requests_per_min: int = Field(
+        default=120,
+        ge=10,
+        le=5000,
+        description="Default requests/minute per client IP (env: RATE_LIMIT_REQUESTS_PER_MIN)",
+    )
+    rate_limit_heavy_requests_per_min: int = Field(
+        default=20,
+        ge=1,
+        le=500,
+        description="Requests/minute for heavy endpoints (env: RATE_LIMIT_HEAVY_REQUESTS_PER_MIN)",
+    )
 
     gemini_generation_model: str = Field(
         default="",

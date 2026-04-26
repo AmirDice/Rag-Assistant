@@ -36,11 +36,19 @@ def _read_env_file(path: Path) -> dict[str, str]:
         out[k] = v
     return out
 
+
+def _admin_headers(env_file: dict[str, str]) -> dict[str, str]:
+    token = (os.getenv("ADMIN_TOKEN", "") or env_file.get("ADMIN_TOKEN", "")).strip()
+    return {"X-Admin-Token": token} if token else {}
+
 page_heading(t("settings_title"), "settings")
 st.caption(t("page_desc_settings"))
 
 
 def _settings_body():
+    env_file = _read_env_file(_DOTENV_PATH)
+    admin_headers = _admin_headers(env_file)
+
     section_header(t("active_config"), "monitoring")
 
     try:
@@ -107,9 +115,9 @@ tenants:
     st.caption(t("prefs_chat_models_help"))
 
     def _load_model_prefs():
-        opt = httpx.get(f"{API_URL}/config/model-options", timeout=8)
+        opt = httpx.get(f"{API_URL}/config/model-options", timeout=8, headers=admin_headers)
         opt.raise_for_status()
-        pref = httpx.get(f"{API_URL}/config/ui-preferences", timeout=8)
+        pref = httpx.get(f"{API_URL}/config/ui-preferences", timeout=8, headers=admin_headers)
         pref.raise_for_status()
         return opt.json(), pref.json()
 
@@ -173,6 +181,7 @@ tenants:
                 r = httpx.put(
                     f"{API_URL}/config/ui-preferences",
                     json=put_body,
+                    headers=admin_headers,
                     timeout=8,
                 )
                 r.raise_for_status()
@@ -186,7 +195,6 @@ tenants:
     st.divider()
     section_header(t("api_keys_title"), "vpn_key")
 
-    env_file = _read_env_file(_DOTENV_PATH)
     keys = {
         "VOYAGE_API_KEY": os.getenv("VOYAGE_API_KEY", "") or env_file.get("VOYAGE_API_KEY", ""),
         "COHERE_API_KEY": os.getenv("COHERE_API_KEY", "") or env_file.get("COHERE_API_KEY", ""),

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+from pathlib import Path
 
 import httpx
 import streamlit as st
@@ -18,6 +19,29 @@ from progress_helpers import run_with_progress
 from ui_style import LOGO_PATH, banner, page_heading, section_header
 
 API_URL = os.getenv("API_URL", "http://localhost:8000")
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+_DOTENV_PATH = _REPO_ROOT / ".env"
+
+
+def _read_env_file(path: Path) -> dict[str, str]:
+    out: dict[str, str] = {}
+    try:
+        raw = path.read_text(encoding="utf-8")
+    except Exception:
+        return out
+    for line in raw.splitlines():
+        s = line.strip()
+        if not s or s.startswith("#") or "=" not in s:
+            continue
+        k, v = s.split("=", 1)
+        out[k.strip()] = v.strip()
+    return out
+
+
+def _admin_headers() -> dict[str, str]:
+    env_file = _read_env_file(_DOTENV_PATH)
+    token = (os.getenv("ADMIN_TOKEN", "") or env_file.get("ADMIN_TOKEN", "")).strip()
+    return {"X-Admin-Token": token} if token else {}
 
 
 def _benchmark_httpx_timeout() -> httpx.Timeout:
@@ -86,7 +110,7 @@ def _run_eval_step(j: dict) -> None:
     }
     params.update(_retrieval_workers_params(int(j.get("retrieval_workers", 0))))
     with _httpx_client() as client:
-        r = client.get(f"{API_URL}/benchmark/run", params=params)
+        r = client.get(f"{API_URL}/benchmark/run", params=params, headers=_admin_headers())
         r.raise_for_status()
         d = r.json()
     j["eval_cum"] = merge_eval_cumulative(j.get("eval_cum"), d)
@@ -123,7 +147,7 @@ def _run_analyze_step(j: dict) -> None:
     }
     params.update(_retrieval_workers_params(int(j.get("retrieval_workers", 0))))
     with _httpx_client() as client:
-        r = client.get(f"{API_URL}/benchmark/analyze", params=params)
+        r = client.get(f"{API_URL}/benchmark/analyze", params=params, headers=_admin_headers())
         r.raise_for_status()
         d = r.json()
     j["anal_workers_used"] = d.get("workers_used")
@@ -159,6 +183,7 @@ def _run_gen_step(j: dict) -> None:
                 "tenant_id": tid,
                 "append": append_param,
             },
+            headers=_admin_headers(),
         )
         r.raise_for_status()
         d = r.json()
@@ -356,6 +381,7 @@ def _benchmark_body():
                         resp = client.get(
                             f"{API_URL}/benchmark/run",
                             params={"validated_only": True, "tenant_id": tid, "top_k": 5},
+                            headers=_admin_headers(),
                         )
                         resp.raise_for_status()
                         return resp.json()
@@ -433,7 +459,7 @@ def _benchmark_body():
                     }
                     p.update(_retrieval_workers_params(retrieval_workers))
                     with _httpx_client() as client:
-                        r = client.get(f"{API_URL}/benchmark/analyze", params=p)
+                        r = client.get(f"{API_URL}/benchmark/analyze", params=p, headers=_admin_headers())
                         r.raise_for_status()
                         return r.json()
 
@@ -524,6 +550,7 @@ def _benchmark_body():
                                 "tenant_id": tenant,
                                 "append": append_only,
                             },
+                            headers=_admin_headers(),
                         )
                         r.raise_for_status()
                         return r.json()

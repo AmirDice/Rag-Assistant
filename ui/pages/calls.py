@@ -11,7 +11,7 @@ import streamlit as st
 
 from i18n import t
 from progress_helpers import run_with_progress
-from ui_style import banner, page_heading, section_header, status_cards
+from ui_style import banner, page_heading, section_header
 
 API_URL = os.getenv("API_URL", "http://localhost:8000")
 
@@ -138,29 +138,6 @@ except Exception as e:
 stats = bundle.get("stats") or {}
 calls_payload = bundle.get("calls") or {}
 calls = calls_payload.get("calls") or []
-
-status_cards(
-    [
-        {
-            "label": t("calls_agent_id"),
-            "state": "on" if bool(agent_id.strip()) else "off",
-            "state_text": t("status_on") if bool(agent_id.strip()) else t("status_off"),
-            "hint": agent_id.strip() or "—",
-        },
-        {
-            "label": t("calls_metric_total"),
-            "state": "on" if int(stats.get("total", 0) or 0) > 0 else "off",
-            "state_text": t("status_on") if int(stats.get("total", 0) or 0) > 0 else t("status_off"),
-            "hint": str(int(stats.get("total", 0) or 0)),
-        },
-        {
-            "label": t("calls_resolved"),
-            "state": "on" if int(stats.get("resolved", 0) or 0) > 0 else "neutral",
-            "state_text": t("status_on") if int(stats.get("resolved", 0) or 0) > 0 else t("status_idle"),
-            "hint": f"{int(stats.get('resolved', 0) or 0)} / {int(stats.get('total', 0) or 0)}",
-        },
-    ]
-)
 
 s1, s2, s3 = st.columns(3)
 s1.metric(t("calls_metric_total"), int(stats.get("total", 0) or 0))
