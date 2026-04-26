@@ -39,6 +39,7 @@ with st.sidebar:
 pg = st.navigation([
     st.Page("pages/chat.py", title=t("page_chat"), icon=":material/chat:", default=True),
     st.Page("pages/corpus.py", title=t("page_corpus"), icon=":material/folder_open:"),
+    st.Page("pages/calls.py", title=t("page_calls"), icon=":material/call:"),
     st.Page("pages/images.py", title=t("page_images"), icon=":material/image:"),
     st.Page("pages/benchmark.py", title=t("page_benchmark"), icon=":material/analytics:"),
     st.Page("pages/benchmark_review.py", title=t("page_review"), icon=":material/fact_check:"),
