@@ -112,6 +112,7 @@ class QueryResponse(BaseModel):
 class FeedbackRequest(BaseModel):
     query_id: str
     rating: str  # "ok" | "not_ok"
+    stars: Optional[int] = Field(default=None, ge=0, le=5)
     reason: Optional[str] = None
     correction: Optional[str] = None
     tenant_id: str = "demo"

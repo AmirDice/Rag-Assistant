@@ -461,17 +461,23 @@ def render_response(resp: dict, *, gallery_key_suffix: str = "") -> None:
     top = chunks[0]
     rest = chunks[1:]
 
-    def _main_answer_block():
-        if synth_raw:
-            sd = _clean_chunk_text(synth_raw)
-            if sd.strip():
-                st.markdown(sd)
-                st.divider()
+    # If we have synthesized text, treat it as the primary answer and keep chunks
+    # in the "Sources consulted" area so it does not look like chunk-only mode.
+    if synth_raw:
+        sd = _clean_chunk_text(synth_raw)
+        if sd.strip():
+            st.markdown(sd)
+            st.divider()
+    else:
         render_answer_chunk(top, 0)
-
-    _main_answer_block()
     _render_chat_image_gallery(image_paths, qkey)
-    if rest:
+    if synth_raw:
+        _render_secondary_sources_row(
+            chunks,
+            float(top.get("score") or 0.0),
+            str(resp.get("query_id") or "unknown"),
+        )
+    elif rest:
         _render_secondary_sources_row(
             rest,
             float(top.get("score") or 0.0),
@@ -495,38 +501,56 @@ def render_feedback(query_id: str):
 
     cols = st.columns([1, 1, 8])
     with cols[0]:
-        if st.button(t("btn_useful"), key=f"ok_{query_id}", icon=":material/thumb_up:"):
-            _send_feedback(query_id, "ok")
-            st.session_state[feedback_key] = "sent"
-            st.rerun()
-    with cols[1]:
-        if st.button(t("btn_not_useful"), key=f"nok_{query_id}", icon=":material/thumb_down:"):
+        if st.button("", key=f"ok_{query_id}", icon=":material/thumb_up:", help=t("btn_useful")):
             st.session_state[f"show_feedback_form_{query_id}"] = True
+            st.session_state[f"feedback_rating_{query_id}"] = "ok"
+    with cols[1]:
+        if st.button("", key=f"nok_{query_id}", icon=":material/thumb_down:", help=t("btn_not_useful")):
+            st.session_state[f"show_feedback_form_{query_id}"] = True
+            st.session_state[f"feedback_rating_{query_id}"] = "not_ok"
 
     if st.session_state.get(f"show_feedback_form_{query_id}"):
-        reason = st.selectbox(
-            t("feedback_reason"),
-            t_list("feedback_reasons"),
-            key=f"reason_{query_id}",
+        star = st.select_slider(
+            t("feedback_stars"),
+            options=[0, 1, 2, 3, 4, 5],
+            value=5,
+            format_func=lambda x: "★" * int(x) + ("☆" * (5 - int(x))),
+            key=f"stars_{query_id}",
         )
+        reason = None
+        rating = st.session_state.get(f"feedback_rating_{query_id}", "not_ok")
+        if rating == "not_ok":
+            reason = st.selectbox(
+                t("feedback_reason"),
+                t_list("feedback_reasons"),
+                key=f"reason_{query_id}",
+            )
         correction = st.text_area(
             t("feedback_correction"),
             key=f"correction_{query_id}",
         )
         if st.button(t("feedback_send"), key=f"send_{query_id}"):
-            _send_feedback(query_id, "not_ok", reason, correction or None)
+            _send_feedback(query_id, rating, int(star), reason, correction or None)
             st.session_state[feedback_key] = "sent"
             st.session_state[f"show_feedback_form_{query_id}"] = False
             st.rerun()
 
 
-def _send_feedback(query_id: str, rating: str, reason: str = None, correction: str = None):
+def _send_feedback(
+    query_id: str,
+    rating: str,
+    stars: int | None = None,
+    reason: str = None,
+    correction: str = None,
+):
     try:
         payload = {
             "query_id": query_id,
             "rating": rating,
             "tenant_id": st.session_state.get("tenant_id", "demo"),
         }
+        if stars is not None:
+            payload["stars"] = int(stars)
         if reason:
             payload["reason"] = reason
         if correction:
@@ -613,6 +637,11 @@ def _chat_body():
                     if not resp.get("answer_chunks"):
                         st.warning(t("no_results"))
                     else:
+                        if gen and not (resp.get("synthesized_answer") or "").strip():
+                            st.warning(
+                                "Generation was requested, but no synthesized answer was produced. "
+                                "Showing retrieved source chunks instead."
+                            )
                         render_response(resp, gallery_key_suffix=_gal_suf)
                     st.session_state.messages.append({
                         "role": "assistant",
