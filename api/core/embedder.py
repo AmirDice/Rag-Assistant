@@ -165,3 +165,15 @@ def get_embedder() -> Embedder:
             raise ValueError(f"Unknown embedding provider: {active}")
         logger.info("Embedder initialized: %s", active)
     return _embedder_instance
+
+
+def get_active_embedding_dimensions(settings=None) -> int:
+    """Return the configured embedding dimension for the active provider."""
+    settings = settings or get_settings()
+    cfg = settings.models_config()
+    active = cfg["embedding"]["active"]
+    dims = cfg["embedding"].get(active, {}).get("dimensions", 1024)
+    try:
+        return int(dims)
+    except (TypeError, ValueError):
+        return 1024

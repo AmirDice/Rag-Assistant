@@ -1,0 +1,28 @@
+You are extracting structured call-center metadata from a **diarized** Spanish transcript (pharmacy / Farmasoft support).
+Output must be **one JSON object only** (no markdown fences, no commentary).
+
+## Call context
+- **call_id**: {{ call_id }}
+- **source_file**: {{ source_file }}
+- **source_file_hash (SHA-256)**: {{ source_file_hash }}
+- **Recording window (relative to this slice)**: {{ timestamp_start }} – {{ timestamp_end }}
+
+## Diarized transcript (times are relative to this slice, starting near 00:00)
+{{ diarized_block }}
+
+## Instructions (verbosity is required)
+- Be **explicit and verbose** in `descripcion_problema`, `resolucion`, and `resumen`. Include symptoms, error text, menu paths, and what was tried.
+- `problema_corto`: one dense line (still informative).
+- `causa_raiz`: only if clearly stated; else `null`.
+- `farmacia`, `llamante`, `agent`: extract only if clearly stated in the transcript; otherwise `null` (do not invent).
+- `resolucion_exitosa`: `true` only if the transcript shows a clear resolution or confirmed fix; otherwise `false`.
+- `rag_qa`: **1–4** items. Each **answer** must read like **internal documentation**: step-by-step, actionable, with **menu paths** or shortcuts (e.g. *Archivo → …*) where applicable. Use `category` like `stock-management`, `estupefacientes`, `pedidos`, `caja`, `informes`, etc. Each item's `confidence` must be a **number from 0.0 to 1.0** (e.g. `0.85`), not words like `"high"`.
+- `software_features`: concrete Farmasoft features or keys mentioned (e.g. `Control+F`, `diario_ventas`).
+- `error_codes`: literal error strings or codes mentioned.
+- `tags`: 3–12 domain tags for retrieval (Spanish ok).
+- `transcript`: copy segment lines with numeric `start` / `end` in **seconds** (floats), `speaker`, `text` — align with the diarized block above.
+
+## JSON shape (all keys required; use `null` only where allowed below)
+{{ schema_hint }}
+
+Respond with the JSON object only.

@@ -52,6 +52,34 @@ class Settings(BaseSettings):
         default="INFO",
         description="Root log level: DEBUG, INFO, WARNING (env: LOG_LEVEL)",
     )
+    audio_rag_qdrant_collection: str = Field(
+        default="audio_calls",
+        description="Qdrant collection used by audio pipeline outputs",
+    )
+    audio_index_sqlite_path: str = Field(
+        default="",
+        description="Optional custom path for audio index dedup sqlite",
+    )
+    audio_calls_catalog_sqlite_path: str = Field(
+        default="",
+        description="Optional custom path for audio calls catalog sqlite",
+    )
+    audio_output_dir: str = Field(
+        default="",
+        description="Optional output directory for analyzed calls JSON files",
+    )
+    audio_uploads_dir: str = Field(
+        default="",
+        description="Optional upload directory for call audio files",
+    )
+    audio_pipeline_dedup_threshold: float = Field(
+        default=0.92,
+        description="Dedup similarity threshold for RAG Q/A points",
+    )
+    audio_issue_dedup_threshold: float = Field(
+        default=0.94,
+        description="Dedup similarity threshold for issue-summary points",
+    )
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 

@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from api.routes import query, ingest, feedback, admin, benchmark, tenant, ui_config
+from api.routes import query, ingest, feedback, admin, benchmark, tenant, ui_config, calls
 from api.core.cache import get_cache
 from api.core.settings import get_settings
 
@@ -43,6 +43,7 @@ app.include_router(admin.router, tags=["admin"])
 app.include_router(benchmark.router, tags=["benchmark"])
 app.include_router(tenant.router)
 app.include_router(ui_config.router, tags=["config"])
+app.include_router(calls.router, tags=["calls"])
 
 settings = get_settings()
 from pathlib import Path
