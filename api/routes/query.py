@@ -86,11 +86,15 @@ async def query_endpoint(req: QueryRequest) -> QueryResponse:
     resp.matched_terms = pre.matched_terms
 
     if req.generate and resp.answer_chunks:
-        resp.synthesized_answer = await generate_answer(
+        gen = await generate_answer(
             req.question,
             resp.answer_chunks,
             generation_model=req.generation_model,
         )
+        resp.synthesized_answer = gen.text
+        resp.total_estimated_cost = gen.estimated_cost
+        resp.cost_currency = gen.cost_currency
+        resp.cost_breakdown = gen.cost_breakdown
         _apply_grounding_guard(resp)
 
     await cache.set(req.question + cache_key_suffix, req.tenant_id, resp.model_dump())

@@ -113,6 +113,10 @@ class QueryResponse(BaseModel):
     original_query: Optional[str] = None
     retrieval_query: Optional[str] = None
     matched_terms: list[str] = []
+    # Estimated cost of the synthesized answer (0 when no generation / unpriced).
+    total_estimated_cost: float = 0.0
+    cost_currency: str = "USD"
+    cost_breakdown: dict = {}
 
 
 # ── Feedback API (WP15 §15.2) ────────────────────────────────

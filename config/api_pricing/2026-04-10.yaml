@@ -1,0 +1,94 @@
+# Versioned provider pricing (USD) used for cost metering.
+#
+# The cost meter loads the lexicographically-latest file in this folder (dates
+# sort), so to update prices add a new YYYY-MM-DD.yaml rather than editing this.
+#
+# Resolution order per call: providers.<p>.models.<model>.operations.<op>
+#   → providers.<p>.operations.<op> → fallback_zero (cost 0).
+#
+# Metrics:
+#   io_tokens     — separate input/output(/thoughts) per-1k rates (LLM generation)
+#   total_tokens  — single per-1k rate over all tokens (embeddings)
+#   search_units  — per-unit rate (e.g. Cohere rerank search units)
+
+currency: "USD"
+
+providers:
+  # Voyage embeddings + reranker (config/models.yaml active embedding/reranker).
+  voyage:
+    operations:
+      embed:
+        metric: "total_tokens"
+        price_per_1k: 0.00006     # voyage-4-large
+      rerank:
+        metric: "total_tokens"
+        price_per_1k: 0.00005     # rerank-2.5
+
+  cohere:
+    operations:
+      rerank:
+        metric: "search_units"
+        price_per_unit: 0.002
+
+  # Gemini generation/vision (GeminiBackend reports provider="google").
+  # Default rates = gemini-2.5-flash-lite; per-model overrides below.
+  google:
+    operations:
+      embed:
+        metric: "total_tokens"
+        price_per_1k: 0.00002
+      generate_text:
+        metric: "io_tokens"
+        input_per_1k: 0.00010     # $0.10 / 1M
+        output_per_1k: 0.00040    # $0.40 / 1M
+        thoughts_per_1k: 0.00040
+      generate_multimodal:
+        metric: "io_tokens"
+        input_per_1k: 0.00010
+        output_per_1k: 0.00040
+        thoughts_per_1k: 0.00040
+    models:
+      gemini-2.5-flash:
+        operations:
+          generate_text:
+            metric: "io_tokens"
+            input_per_1k: 0.00030   # $0.30 / 1M
+            output_per_1k: 0.00250  # $2.50 / 1M (incl. thinking)
+            thoughts_per_1k: 0.00250
+          generate_multimodal:
+            metric: "io_tokens"
+            input_per_1k: 0.00030
+            output_per_1k: 0.00250
+            thoughts_per_1k: 0.00250
+
+  # OpenAI-compatible gateways (OpenAICompatBackend reports provider="openai_compat").
+  # Default rates = gpt-4o-mini; per-model overrides below.
+  openai_compat:
+    operations:
+      generate_text:
+        metric: "io_tokens"
+        input_per_1k: 0.00015     # gpt-4o-mini: $0.15 / 1M
+        output_per_1k: 0.00060    # $0.60 / 1M
+        thoughts_per_1k: 0.00060
+      generate_multimodal:
+        metric: "io_tokens"
+        input_per_1k: 0.00015
+        output_per_1k: 0.00060
+        thoughts_per_1k: 0.00060
+    models:
+      gpt-4:
+        operations:
+          generate_text:
+            metric: "io_tokens"
+            input_per_1k: 0.03000   # $30 / 1M
+            output_per_1k: 0.06000  # $60 / 1M
+            thoughts_per_1k: 0.06000
+
+  # Self-hosted models via Ollama are free at the API boundary → fallback_zero.
+  ollama:
+    operations:
+      generate_text:
+        metric: "io_tokens"
+        input_per_1k: 0.0
+        output_per_1k: 0.0
+        thoughts_per_1k: 0.0

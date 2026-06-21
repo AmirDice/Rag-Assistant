@@ -126,6 +126,21 @@ class Settings(BaseSettings):
     def models_config(self) -> dict:
         return self.load_yaml("models.yaml")
 
+    def api_pricing_config(self) -> dict:
+        """Load the latest versioned pricing file from config/api_pricing/.
+
+        Files are named YYYY-MM-DD.yaml; the lexicographically-last one wins.
+        Returns {} if the folder or files are missing (cost falls back to 0).
+        """
+        pricing_dir = self.config_path / "api_pricing"
+        if not pricing_dir.is_dir():
+            return {}
+        files = sorted(p for p in pricing_dir.glob("*.yaml"))
+        if not files:
+            return {}
+        with open(files[-1], encoding="utf-8") as f:
+            return yaml.safe_load(f) or {}
+
 
 @lru_cache
 def get_settings() -> Settings:
