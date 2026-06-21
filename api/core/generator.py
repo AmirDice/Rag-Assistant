@@ -1,4 +1,10 @@
-"""LLM answer generation — synthesize an answer from retrieved chunks (Gemini or OpenAI)."""
+"""LLM answer generation — synthesize an answer from retrieved chunks.
+
+Generation is provider-agnostic: this module assembles the system prompt and
+the user message, resolves the requested model id to a catalog entry, and
+delegates to a :class:`GenerationBackend` (Gemini / OpenAI-compat / Ollama)
+built by the factory. Adding a provider never touches this file.
+"""
 
 from __future__ import annotations
 
@@ -40,53 +46,21 @@ def _build_context(chunks: list[AnswerChunk]) -> str:
     return "\n\n---\n\n".join(parts)
 
 
-async def _generate_gemini(
-    settings,
-    model_name: str,
-    system_prompt: str,
-    user_message: str,
-) -> str:
-    from google import genai
-
-    client = genai.Client(api_key=settings.google_api_key)
-    response = await client.aio.models.generate_content(
-        model=model_name,
-        contents=[
-            {"role": "user", "parts": [{"text": system_prompt + "\n\n" + user_message}]},
-        ],
-    )
-    return (response.text or "").strip()
-
-
-async def _generate_openai(
-    settings,
-    model_name: str,
-    system_prompt: str,
-    user_message: str,
-) -> str:
-    from openai import AsyncOpenAI
-
-    client = AsyncOpenAI(api_key=settings.openai_api_key)
-    response = await client.chat.completions.create(
-        model=model_name,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_message},
-        ],
-    )
-    msg = response.choices[0].message
-    return (msg.content or "").strip()
-
-
 async def generate_answer(
     question: str,
     chunks: list[AnswerChunk],
     *,
     generation_model: str | None = None,
 ) -> str:
-    """Synthesize an answer from chunks (Gemini or OpenAI, from arg or YAML/env default)."""
-    from api.core.generation_catalog import uses_openai_api
-    from api.core.model_names import gemini_generation_model
+    """Synthesize an answer from chunks via the resolved generation backend.
+
+    ``generation_model`` is a catalog id (e.g. ``gemini-2.5-flash``,
+    ``gpt-4o-mini``, ``llama3.1-local``); when omitted or unknown the default
+    from config/models.yaml is used. Returns "" on any backend failure so the
+    /query route can still serve the retrieved chunks.
+    """
+    from api.core.backends import build_generation_backend
+    from api.core.generation_catalog import generation_model_config
 
     settings = get_settings()
     if not chunks:
@@ -98,25 +72,22 @@ async def generate_answer(
         f"---\n\nPregunta del usuario: {question}"
     )
     system_prompt = _system_prompt_es()
-    model_name = (generation_model or "").strip() or gemini_generation_model()
+    model_cfg = generation_model_config(generation_model)
 
     try:
-        if uses_openai_api(model_name):
-            if not settings.openai_api_key:
-                logger.warning("OPENAI_API_KEY not set — skipping generation")
-                return ""
-            answer = await _generate_openai(
-                settings, model_name, system_prompt, user_message
-            )
-        else:
-            if not settings.google_api_key:
-                logger.warning("GOOGLE_API_KEY not set — skipping generation")
-                return ""
-            answer = await _generate_gemini(
-                settings, model_name, system_prompt, user_message
-            )
-        logger.info("Generated answer: %d chars", len(answer))
+        backend = build_generation_backend(settings, model_cfg)
+        result = await backend.generate(prompt=system_prompt, chunks=[user_message], images=None)
+        answer = (result.text or "").strip()
+        logger.info(
+            "Generated answer: %d chars via %s/%s (units_in=%.0f units_out=%.0f basis=%s)",
+            len(answer),
+            model_cfg.provider,
+            model_cfg.model,
+            result.units_in,
+            result.units_out,
+            result.units_basis,
+        )
         return answer
     except Exception as e:
-        logger.error("Answer generation failed: %s", e)
+        logger.error("Answer generation failed (%s/%s): %s", model_cfg.provider, model_cfg.model, e)
         return ""

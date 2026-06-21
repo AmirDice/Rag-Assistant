@@ -2,14 +2,60 @@
 
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter
 
 from api.core.models import QueryRequest, QueryResponse
 from api.core.cache import get_cache
 from api.core.retriever import retrieve
 from api.core.generator import generate_answer
+from api.core.grounding_verifier import verify_answer_grounding
+from api.core.query_preprocessor import preprocess_query
+from api.core.settings import get_settings
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+# Shown in place of an ungrounded answer when the grounding guard trips.
+_GROUNDING_FALLBACK = (
+    "No tengo suficiente evidencia en la documentación recuperada para dar una "
+    "respuesta fiable. ¿Puedes concretar un poco más la consulta?"
+)
+
+
+def _apply_grounding_guard(resp: QueryResponse) -> None:
+    """Verify the synthesized answer against retrieved chunks (in place).
+
+    Always attaches grounding metadata. When the guard is enabled in
+    config/models.yaml and the answer falls below the support threshold, the
+    answer is replaced with a safe fallback so we don't surface confident
+    hallucinations.
+    """
+    if not resp.synthesized_answer or not resp.answer_chunks:
+        return
+    retrieval_cfg = get_settings().models_config().get("retrieval", {}) or {}
+    if not retrieval_cfg.get("grounding_enabled", True):
+        return
+    try:
+        min_ratio = float(retrieval_cfg.get("grounding_min_ratio", 0.6))
+    except (TypeError, ValueError):
+        min_ratio = 0.6
+
+    result = verify_answer_grounding(
+        resp.synthesized_answer, resp.answer_chunks, min_grounded_ratio=min_ratio
+    )
+    resp.grounded = result.grounded
+    resp.grounding_ratio = round(result.grounded_ratio, 3)
+    if not result.grounded:
+        logger.warning(
+            "grounding_guard_rejected query_id=%s ratio=%.3f unsupported=%d/%d",
+            resp.query_id,
+            result.grounded_ratio,
+            result.unsupported_sentences,
+            result.checked_sentences,
+        )
+        resp.synthesized_answer = _GROUNDING_FALLBACK
 
 
 @router.post("/query", response_model=QueryResponse)
@@ -30,7 +76,14 @@ async def query_endpoint(req: QueryRequest) -> QueryResponse:
         resp.cache_hit = True
         return resp
 
-    resp = await retrieve(req)
+    # Preprocess the query (glossary enrichment / optional spell-fix) so the
+    # embedder sees canonical terminology. Original question still drives rerank
+    # + generation.
+    pre = await preprocess_query(req.question, tenant_id=req.tenant_id)
+    resp = await retrieve(req, retrieval_query=pre.retrieval_query)
+    resp.original_query = pre.original
+    resp.retrieval_query = pre.retrieval_query
+    resp.matched_terms = pre.matched_terms
 
     if req.generate and resp.answer_chunks:
         resp.synthesized_answer = await generate_answer(
@@ -38,6 +91,7 @@ async def query_endpoint(req: QueryRequest) -> QueryResponse:
             resp.answer_chunks,
             generation_model=req.generation_model,
         )
+        _apply_grounding_guard(resp)
 
     await cache.set(req.question + cache_key_suffix, req.tenant_id, resp.model_dump())
 

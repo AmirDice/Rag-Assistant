@@ -9,7 +9,7 @@ from typing import Any, Optional
 from fastapi import APIRouter
 from pydantic import BaseModel, field_validator
 
-from api.core.generation_catalog import GENERATION_MODEL_IDS, generation_options_payload
+from api.core.generation_catalog import generation_model_ids, generation_options_payload
 from api.core.settings import get_settings
 
 router = APIRouter()
@@ -45,8 +45,9 @@ class UiPreferences(BaseModel):
         s = v.strip()
         if len(s) > 128:
             raise ValueError("generation_model too long")
-        if s not in GENERATION_MODEL_IDS:
-            raise ValueError(f"generation_model must be one of {GENERATION_MODEL_IDS}")
+        allowed = generation_model_ids()
+        if s not in allowed:
+            raise ValueError(f"generation_model must be one of {allowed}")
         return s
 
 

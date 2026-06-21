@@ -7,7 +7,7 @@ from uuid import uuid4
 
 from pydantic import BaseModel, Field, field_validator
 
-from api.core.generation_catalog import GENERATION_MODEL_IDS
+from api.core.generation_catalog import generation_model_ids
 
 
 # ── Document metadata (WP12 §12.2) ──────────────────────────
@@ -81,8 +81,9 @@ class QueryRequest(BaseModel):
         s = v.strip()
         if len(s) > 128:
             raise ValueError("generation_model too long")
-        if s not in GENERATION_MODEL_IDS:
-            raise ValueError(f"generation_model must be one of {list(GENERATION_MODEL_IDS)}")
+        allowed = generation_model_ids()
+        if s not in allowed:
+            raise ValueError(f"generation_model must be one of {list(allowed)}")
         return s
 
 class AnswerChunk(BaseModel):
@@ -105,6 +106,13 @@ class QueryResponse(BaseModel):
     reranked: bool = False
     cache_hit: bool = False
     query_id: str = Field(default_factory=lambda: str(uuid4()))
+    # Post-generation grounding check (None when no answer was synthesized).
+    grounded: Optional[bool] = None
+    grounding_ratio: Optional[float] = None
+    # Query preprocessing transparency (what was actually embedded for retrieval).
+    original_query: Optional[str] = None
+    retrieval_query: Optional[str] = None
+    matched_terms: list[str] = []
 
 
 # ── Feedback API (WP15 §15.2) ────────────────────────────────

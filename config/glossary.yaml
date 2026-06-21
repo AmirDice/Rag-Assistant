@@ -1,0 +1,108 @@
+# Domain glossary — seed data loaded into SQLite on first startup.
+#
+# Purpose
+#   • Fix domain-specific typos/variants that a generic spell-checker never
+#     catches (ERP acronyms, product-line names, Spanish pharmacy terms).
+#   • Enrich short / shorthand queries with canonical terms so retrieval
+#     (dense + sparse) has the right tokens to match.
+#
+# Runtime behaviour
+#   • The glossary is editable from the UI / admin API. Edits in the DB
+#     override this file.
+#   • `term`        → canonical form written into the enriched query.
+#   • `aliases`     → variants/typos that, when detected, get replaced
+#                      by `term` (case-insensitive, accent-insensitive,
+#                      whole-word match).
+#   • `expansion`   → optional extra tokens appended to the enriched query
+#                      to widen lexical recall (sparse BM25).
+#   • `description` → human-readable note shown in admin UI; never sent to LLM.
+#
+# IMPORTANT
+#   Keep entries short and specific. Broad synonyms here will degrade
+#   precision on high-quality queries.
+
+version: 1
+
+entries:
+  - term: "HCP"
+    aliases: ["hcp", "h.c.p.", "h c p", "hoja cupon precinto", "hoja cupón precinto", "hojas cupon precinto"]
+    expansion: "hoja cupón precinto"
+    description: "Hoja Cupón Precinto (facturación MUFACE / receta electrónica)."
+
+  - term: "SEVeM"
+    aliases: ["sevem", "se vem", "alerta sevem", "alertas sevem", "alerta medicamento"]
+    expansion: "sistema español verificación medicamentos"
+    description: "Sistema Español de Verificación de Medicamentos."
+
+  - term: "ABCD"
+    aliases: ["abcd", "a.b.c.d.", "a b c d", "clasificacion abcd", "clasificación abcd"]
+    expansion: "clasificación ABCD artículos"
+    description: "Clasificación ABCD de artículos por rotación de stock."
+
+  - term: "SISCATA"
+    aliases: ["siscata", "sis cata", "sistema siscata", "alerta siscata"]
+    expansion: "sistema información stocks cataluña"
+    description: "Sistema de información de stocks de Cataluña (CatSalut)."
+
+  - term: "MUFACE"
+    aliases: ["muface", "mu face", "muface hcp", "receta muface", "recetas muface"]
+    expansion: "receta MUFACE facturación HCP"
+    description: "Mutualidad de Funcionarios Civiles del Estado — facturación HCP."
+
+  - term: "Nodofarma"
+    aliases: ["nodofarma", "nodo farma", "nofarma", "no do farma", "node farma", "nodofarma venta", "nodofarma dispensacion", "nodofarma dispensación"]
+    expansion: "receta electrónica Nodofarma"
+    description: "Plataforma de receta electrónica del Consejo General."
+
+  - term: "cartera"
+    aliases: ["cartera", "carteras", "mi cartera", "una cartera", "crear cartera"]
+    expansion: "cartera de compras PVF optimización"
+    description: "Cartera de compras optimizada por PVF (precio venta farmacia)."
+
+  - term: "lista de caducidades"
+    aliases: ["lista caducidades", "listado caducidades", "listado de caducidades", "caducidades articulos", "lista caduca"]
+    expansion: "lista de caducidades de artículos caducados próximos"
+    description: "Listado de artículos por fecha de caducidad."
+
+  - term: "cambio de ejercicio"
+    aliases: ["cambio ejercicio", "cambio de ejercicio", "cambio año fiscal", "cierre ejercicio", "cierre de ejercicio"]
+    expansion: "cierre de ejercicio fiscal anual"
+    description: "Proceso de cierre/apertura de ejercicio contable anual."
+
+  - term: "receta electrónica"
+    aliases: ["receta electronica", "recetas electronicas", "receta e", "e-receta", "receta digital"]
+    expansion: "receta electrónica dispensación"
+    description: "Sistema nacional de receta electrónica."
+
+  - term: "encargo"
+    aliases: ["encargo", "encargos", "enargo", "pedido cliente", "hacer encargo", "nuevo encargo"]
+    expansion: "encargo de cliente pedido"
+    description: "Encargo de cliente (apartar artículo pendiente de recibir)."
+
+  - term: "libro de estupefacientes"
+    aliases: ["libro estupefacientes", "estupefacientes", "estupefadientes", "libro psicotropos", "notificar estupefacientes"]
+    expansion: "libro de estupefacientes notificación electrónica"
+    description: "Libro oficial de estupefacientes y psicótropos."
+
+  - term: "CashFarma"
+    aliases: ["cashfarma", "cash farma", "cashlogy", "cash logy", "caja inteligente"]
+    expansion: "CashFarma caja inteligente CashLogy"
+    description: "Integración con caja inteligente CashLogy / CashFarma."
+
+  - term: "protocolo de comunicación"
+    aliases: ["protocolo comunicacion", "protocolo comunicación", "protocolo de comunicacion", "protocolo f3", "protocolo pedidos"]
+    expansion: "protocolo de comunicación pedidos F3"
+    description: "Protocolo de comunicación con proveedores (F3)."
+
+  - term: "Farmasoft"
+    aliases:
+      - "farmasoft"
+      - "farmaso"
+      - "farma soft"
+      - "farmatic"
+      - "armasoft"
+      - "arma soft"
+      - "pharmasoft"
+      - "pharma soft"
+    expansion: "Farmasoft ERP soporte farmacéutico"
+    description: "Marca del producto — corrección de errores frecuentes de ASR en llamadas."

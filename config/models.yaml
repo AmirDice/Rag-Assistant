@@ -40,11 +40,43 @@ retrieval:
   score_threshold: 0.3     # minimum similarity for inclusion
   # Parallel /benchmark/run and /benchmark/analyze (async retrieval, like ingest workers).
   benchmark_concurrency: 4
+  # Post-generation grounding guard: flag (and optionally replace) synthesized
+  # answers whose sentences aren't lexically supported by the retrieved chunks.
+  grounding_enabled: true
+  grounding_min_ratio: 0.6   # fraction of answer sentences that must be supported
 
 # Override any model via env without code changes:
 #   GEMINI_GENERATION_MODEL, GEMINI_VISION_MODEL
+#
+# Provider-agnostic generation catalog. Each id maps to a provider + connection
+# details; the backend factory (api/core/backends/factory.py) turns an entry
+# into a concrete backend. Secrets stay in env via *_ref (a Settings attribute
+# name) instead of being written here.
 generation:
-  model: "gemini-2.5-flash-lite"
+  default_model: "gemini-2.5-flash-lite"
+  model: "gemini-2.5-flash-lite"   # legacy alias still read by model_names.gemini_generation_model()
+  available_models:
+    gemini-2.5-flash-lite:
+      provider: gemini
+      model: gemini-2.5-flash-lite
+    gemini-2.5-flash:
+      provider: gemini
+      model: gemini-2.5-flash
+    gpt-4o-mini:
+      provider: openai_compat
+      model: gpt-4o-mini
+      base_url: "https://api.openai.com/v1"
+      api_key_ref: openai_api_key
+    gpt-4:
+      provider: openai_compat
+      model: gpt-4
+      base_url: "https://api.openai.com/v1"
+      api_key_ref: openai_api_key
+    # Self-hosted example — needs a running Ollama server (set OLLAMA_BASE_URL):
+    llama3.1-local:
+      provider: ollama
+      model: "llama3.1"
+      base_url_ref: ollama_base_url
 
 vision:
   active: "gemini"
@@ -53,6 +85,14 @@ vision:
   # Lower cost option: gemini-2.5-flash-lite (see scripts/model_latency_smoke.py)
   gpt4o_mini:
     model: "gpt-4o-mini"
+
+# Query preprocessing — glossary enrichment + optional LLM spell/accent fix.
+# Runs before retrieval; the original question still drives rerank + generation.
+query_preprocessor:
+  enabled: true             # deterministic glossary match (no LLM cost)
+  ai_enabled: false         # optional LLM correction pass (needs ai_model_id)
+  ai_model_id: ""           # a generation.available_models id, e.g. gemini-2.5-flash-lite
+  ai_timeout_sec: 4.0
 
 cache:
   mode: "semantic"            # memory | redis | semantic (Tier 3: Redis + embedding similarity)

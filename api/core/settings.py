@@ -56,6 +56,10 @@ class Settings(BaseSettings):
         default="",
         description="Override vision/captioning model ID (env: GEMINI_VISION_MODEL)",
     )
+    ollama_base_url: str = Field(
+        default="http://localhost:11434",
+        description="Base URL of an Ollama server for self-hosted models (env: OLLAMA_BASE_URL)",
+    )
     ingestion_workers: int = Field(
         default=4,
         ge=1,

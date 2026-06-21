@@ -264,16 +264,27 @@ def _apply_doc_diversity(
     return result
 
 
-async def retrieve(request: QueryRequest) -> QueryResponse:
-    """Full retrieval pipeline: embed → Qdrant search → rerank → format."""
+async def retrieve(
+    request: QueryRequest,
+    *,
+    retrieval_query: Optional[str] = None,
+) -> QueryResponse:
+    """Full retrieval pipeline: embed → Qdrant search → rerank → format.
+
+    ``retrieval_query`` (from the query preprocessor) is what gets embedded; it
+    may be a glossary-enriched / spell-corrected form of the user's question.
+    Reranking and answer generation still use ``request.question`` so the user's
+    original intent drives the final ordering and the LLM prompt.
+    """
     settings = get_settings()
     tenant_cfg = merged_tenant_config(request.tenant_id)
     models_cfg = settings.models_config()
 
     initial_top_k = models_cfg.get("retrieval", {}).get("initial_top_k", 20)
 
+    embed_text = (retrieval_query or "").strip() or request.question
     embedder = get_embedder()
-    query_vec = await embedder.embed_query(request.question)
+    query_vec = await embedder.embed_query(embed_text)
 
     # Search Qdrant
     qdrant = AsyncQdrantClient(url=settings.qdrant_url)
