@@ -47,6 +47,12 @@ class ChunkPayload(BaseModel):
 
 # ── Query API (WP15 §15.2) ──────────────────────────────────
 
+class PriorTurn(BaseModel):
+    """One prior conversation turn, for multi-turn / clarification context."""
+    question: str = ""
+    answer: str = ""
+
+
 class QueryRequest(BaseModel):
     question: str
     tenant_id: str = "demo"
@@ -60,6 +66,10 @@ class QueryRequest(BaseModel):
     generation_model: Optional[str] = Field(
         default=None,
         description="Override generation model id (Gemini or GPT; omit = use YAML / env)",
+    )
+    prior_turns: list[PriorTurn] = Field(
+        default_factory=list,
+        description="Recent conversation turns for multi-turn / clarification context",
     )
 
     @field_validator("reranker")
@@ -117,6 +127,10 @@ class QueryResponse(BaseModel):
     total_estimated_cost: float = 0.0
     cost_currency: str = "USD"
     cost_breakdown: dict = {}
+    # Query intent planner (clarification flow).
+    needs_clarification: bool = False
+    message_type: str = "final_answer"   # final_answer | clarification_question | no_answer
+    final_query: Optional[str] = None
 
 
 # ── Feedback API (WP15 §15.2) ────────────────────────────────

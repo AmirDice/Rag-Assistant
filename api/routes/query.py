@@ -12,6 +12,11 @@ from api.core.retriever import retrieve
 from api.core.generator import generate_answer
 from api.core.grounding_verifier import verify_answer_grounding
 from api.core.query_preprocessor import preprocess_query
+from api.core.query_intent_planner import (
+    plan_query_intent,
+    preliminary_top_k,
+    query_refinement_enabled,
+)
 from api.core.settings import get_settings
 
 router = APIRouter()
@@ -80,14 +85,50 @@ async def query_endpoint(req: QueryRequest) -> QueryResponse:
     # embedder sees canonical terminology. Original question still drives rerank
     # + generation.
     pre = await preprocess_query(req.question, tenant_id=req.tenant_id)
-    resp = await retrieve(req, retrieval_query=pre.retrieval_query)
+
+    generation_question = req.question
+    retrieval_query = pre.retrieval_query
+    prelim_resp = None
+
+    # Optional intent planner: preliminary retrieval → refine the query or ask
+    # ONE clarification question. Off by default; falls back to plain search.
+    if req.generate and query_refinement_enabled():
+        prelim_req = req.model_copy(update={"top_k": max(req.top_k, preliminary_top_k())})
+        prelim_resp = await retrieve(prelim_req, retrieval_query=pre.retrieval_query)
+        decision = await plan_query_intent(
+            preprocessed=pre,
+            chunks=prelim_resp.answer_chunks,
+            prior_turns=list(req.prior_turns or []),
+        )
+        if decision.needs_clarification:
+            # Clarification turns depend on conversation state — not cached.
+            return QueryResponse(
+                answer_chunks=[],
+                synthesized_answer=decision.clarification_question,
+                needs_clarification=True,
+                message_type="clarification_question",
+                original_query=pre.original,
+                retrieval_query=pre.retrieval_query,
+                final_query=decision.final_query,
+                matched_terms=pre.matched_terms,
+            )
+        retrieval_query = decision.retrieval_query or pre.retrieval_query
+        generation_question = decision.final_query or req.question
+
+    # Reuse the preliminary retrieval when the query didn't change.
+    if prelim_resp is not None and retrieval_query.strip().lower() == pre.retrieval_query.strip().lower():
+        resp = prelim_resp.model_copy(update={"answer_chunks": prelim_resp.answer_chunks[: req.top_k]})
+    else:
+        resp = await retrieve(req, retrieval_query=retrieval_query)
+
     resp.original_query = pre.original
-    resp.retrieval_query = pre.retrieval_query
+    resp.retrieval_query = retrieval_query
     resp.matched_terms = pre.matched_terms
+    resp.final_query = generation_question
 
     if req.generate and resp.answer_chunks:
         gen = await generate_answer(
-            req.question,
+            generation_question,
             resp.answer_chunks,
             generation_model=req.generation_model,
         )
