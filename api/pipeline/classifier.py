@@ -1,85 +1,38 @@
 """WP12 — Document classifier + metadata enrichment.
 
-Integrates the LLM-based classifier (classification/classifier/) for
+Uses the self-contained LLM classifier (api/pipeline/doc_type_llm.py) for
 accurate doc-type detection, then enriches with version/module metadata.
 Falls back to heuristic rules if no LLM API key is available.
 """
 
 from __future__ import annotations
 
-import json
 import logging
-import os
 import re
-import sys
 from pathlib import Path
 from typing import Optional
 
 from langdetect import detect
 
 from api.core.models import DocumentMeta
-from api.core.settings import get_settings
+from api.pipeline.doc_type_llm import classify_document_text
 
 logger = logging.getLogger(__name__)
-
-# Ensure the classification package is importable
-_CLASSIFICATION_ROOT = Path(__file__).resolve().parent.parent.parent / "classification"
-if str(_CLASSIFICATION_ROOT) not in sys.path:
-    sys.path.insert(0, str(_CLASSIFICATION_ROOT))
 
 
 # ── LLM-based classification ─────────────────────────────────
 
-def _get_llm_client():
-    """Try to initialize an LLM client from available API keys."""
-    try:
-        from classifier.providers import get_client
-
-        # Pick the cheapest available provider
-        if os.getenv("DEEPSEEK_API_KEY"):
-            return get_client("deepseek"), "deepseek"
-        if os.getenv("GOOGLE_API_KEY"):
-            return get_client("gemini", "gemini-2.0-flash"), "gemini"
-        if os.getenv("OPENAI_API_KEY"):
-            return get_client("openai", "gpt-4o-mini"), "openai"
-        if os.getenv("ANTHROPIC_API_KEY"):
-            return get_client("claude", "claude-haiku-4-5-20251001"), "claude"
-        return None, None
-    except Exception as e:
-        logger.warning("Could not init LLM client for classification: %s", e)
-        return None, None
-
-
 def _llm_classify(filepath: Path, text_sample: str) -> Optional[dict]:
-    """Classify using the boss's LLM classifier. Returns raw result dict or None."""
-    try:
-        from classifier.classifier import classify_document as llm_classify
-        from classifier.extractor import extract_text
-
-        llm, provider = _get_llm_client()
-        if llm is None:
-            return None
-
-        # Use the extractor's text if we don't have a good sample
-        extracted = extract_text(str(filepath)) if not text_sample else None
-        text = text_sample or extracted or "[No text extracted]"
-
-        doc = {
-            "name": filepath.name,
-            "relative_path": str(filepath.name),
-            "text": text[:3000],
-        }
-        result = llm_classify(doc, llm)
+    """Classify via the self-contained doc_type LLM. Returns result dict or None."""
+    result = classify_document_text(filename=filepath.name, text=text_sample or "")
+    if result:
         logger.info(
             "LLM classified %s → %s (confidence=%.0f%%)",
             filepath.name,
             result.get("type_id", "unknown"),
             result.get("confidence", 0) * 100,
         )
-        return result
-    except Exception as e:
-        logger.warning("LLM classification failed for %s: %s", filepath.name, e)
-        return None
+    return result
 
 
 # ── Mapping from LLM result to DocumentMeta ───────────────────
