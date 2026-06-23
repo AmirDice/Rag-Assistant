@@ -8,7 +8,6 @@ import unicodedata
 from collections import defaultdict
 from typing import Any, Optional
 
-from qdrant_client import AsyncQdrantClient
 from qdrant_client.models import (
     Filter,
     FieldCondition,
@@ -21,6 +20,7 @@ from qdrant_client.models import (
 )
 
 from api.core.settings import get_settings
+from api.core.qdrant import make_qdrant_client
 from api.core.tenant_state import merged_tenant_config
 from api.core.embedder import get_embedder
 from api.core.reranker import get_reranker
@@ -287,7 +287,7 @@ async def retrieve(
     query_vec = await embedder.embed_query(embed_text)
 
     # Search Qdrant
-    qdrant = AsyncQdrantClient(url=settings.qdrant_url)
+    qdrant = make_qdrant_client(settings)
     tenant_filter = _build_tenant_filter(tenant_cfg, request.lang)
 
     try:

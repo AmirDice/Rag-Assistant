@@ -26,6 +26,7 @@ from qdrant_client import AsyncQdrantClient
 from qdrant_client.models import FieldCondition, Filter, FilterSelector, MatchValue
 
 from api.core.settings import get_settings
+from api.core.qdrant import make_qdrant_client
 from modules.audio_pipeline.calls_catalog import (
     CallCatalogRow,
     catalog_stats,
@@ -398,7 +399,7 @@ async def _run_call_pipeline(
         await ensure_audio_collection(collection, dim=dim)
 
         embedder = get_embedder()
-        qdrant = AsyncQdrantClient(url=settings.qdrant_url)
+        qdrant = make_qdrant_client(settings)
         catalog_conn = open_catalog_db(_catalog_path())
         catalog_ids: list[str] = []
         try:
@@ -549,7 +550,7 @@ async def call_delete_endpoint(id: str, request: Request) -> dict:
 
     qdrant: AsyncQdrantClient | None = None
     try:
-        qdrant = AsyncQdrantClient(url=settings.qdrant_url)
+        qdrant = make_qdrant_client(settings)
         await qdrant.delete(
             collection_name=collection,
             points_selector=FilterSelector(

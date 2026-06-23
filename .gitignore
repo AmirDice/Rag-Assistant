@@ -137,6 +137,8 @@ celerybeat.pid
 # Environments
 .env
 .envrc
+# Streamlit secrets (keep the .example, never the real one)
+.streamlit/secrets.toml
 .venv
 env/
 venv/

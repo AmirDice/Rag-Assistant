@@ -10,8 +10,16 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     qdrant_url: str = "http://localhost:6333"
+    qdrant_api_key: str = Field(
+        default="",
+        description="Qdrant API key — required for Qdrant Cloud (env: QDRANT_API_KEY)",
+    )
     qdrant_collection: str = "default"
     redis_url: str = "redis://localhost:6379/0"
+    cache_mode: str = Field(
+        default="",
+        description="Override cache.mode from models.yaml: memory | redis | semantic (env: CACHE_MODE)",
+    )
 
     voyage_api_key: str = ""
     cohere_api_key: str = ""

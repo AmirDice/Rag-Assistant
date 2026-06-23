@@ -177,9 +177,9 @@ def _parse_json_response(text: str) -> dict:
 
 async def _fetch_all_chunks() -> list[dict]:
     """Pull all chunks from Qdrant for benchmark generation."""
-    from qdrant_client import AsyncQdrantClient
+    from api.core.qdrant import make_qdrant_client
     settings = get_settings()
-    qdrant = AsyncQdrantClient(url=settings.qdrant_url)
+    qdrant = make_qdrant_client(settings)
     try:
         all_chunks = []
         offset = None

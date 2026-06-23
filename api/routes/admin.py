@@ -6,10 +6,10 @@ import json
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Header
-from qdrant_client import AsyncQdrantClient
 
 from api.core.models import HealthResponse, StatsResponse
 from api.core.settings import get_settings
+from api.core.qdrant import make_qdrant_client
 from api.core.pipeline_config import build_pipeline_config
 from api.pipeline.indexer import get_collection_stats
 
@@ -23,7 +23,7 @@ async def health_check() -> HealthResponse:
 
     # Check Qdrant
     try:
-        qdrant = AsyncQdrantClient(url=settings.qdrant_url)
+        qdrant = make_qdrant_client(settings)
         await qdrant.get_collections()
         result.qdrant = "ok"
         await qdrant.close()
@@ -179,7 +179,7 @@ async def delete_corpus(
         raise HTTPException(status_code=403, detail="Invalid admin token")
 
     try:
-        qdrant = AsyncQdrantClient(url=settings.qdrant_url)
+        qdrant = make_qdrant_client(settings)
         await qdrant.delete_collection(settings.qdrant_collection)
         await qdrant.close()
     except Exception:

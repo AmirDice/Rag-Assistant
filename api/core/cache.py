@@ -175,7 +175,8 @@ async def get_cache() -> InMemoryCache | RedisCache | SemanticRedisCache:
 
     settings = get_settings()
     cfg = settings.models_config()
-    mode = cfg.get("cache", {}).get("mode", "memory")
+    # CACHE_MODE env overrides models.yaml (lets a no-Redis deploy force memory).
+    mode = (settings.cache_mode or "").strip() or cfg.get("cache", {}).get("mode", "memory")
 
     if mode == "semantic":
         try:

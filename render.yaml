@@ -1,0 +1,33 @@
+# Render blueprint for the FastAPI backend (the Streamlit UI deploys separately
+# on Streamlit Community Cloud — see DEPLOY.md).
+#
+# Create the service: Render Dashboard → New → Blueprint → pick this repo.
+# Then set the `sync: false` secrets in the dashboard (they are not stored here).
+services:
+  - type: web
+    name: rag-assistant-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile.api
+    plan: free
+    healthCheckPath: /readyz
+    envVars:
+      # Vector DB (Qdrant Cloud) — required.
+      - key: QDRANT_URL
+        sync: false
+      - key: QDRANT_API_KEY
+        sync: false
+      # Model providers — required for retrieval + generation.
+      - key: VOYAGE_API_KEY
+        sync: false
+      - key: COHERE_API_KEY
+        sync: false
+      - key: GOOGLE_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      # No Redis on the free plan → force in-memory cache.
+      - key: CACHE_MODE
+        value: memory
+      # Guards admin endpoints; must match the UI's ADMIN_TOKEN secret.
+      - key: ADMIN_TOKEN
+        sync: false

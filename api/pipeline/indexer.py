@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 import uuid
 
-from qdrant_client import AsyncQdrantClient
 from qdrant_client.models import (
     Distance,
     VectorParams,
@@ -13,6 +12,7 @@ from qdrant_client.models import (
 )
 
 from api.core.settings import get_settings
+from api.core.qdrant import make_qdrant_client
 from api.core.embedder import get_embedder
 from api.core.models import ChunkPayload
 
@@ -24,7 +24,7 @@ EMBEDDING_DIM = 1024
 async def ensure_collection() -> None:
     """Create the Qdrant collection if it doesn't exist."""
     settings = get_settings()
-    qdrant = AsyncQdrantClient(url=settings.qdrant_url)
+    qdrant = make_qdrant_client(settings)
     try:
         collections = await qdrant.get_collections()
         names = [c.name for c in collections.collections]
@@ -81,7 +81,7 @@ async def index_chunks(chunks: list[ChunkPayload]) -> int:
         logger.error("No valid embeddings produced for %d chunks", len(chunks))
         return 0
 
-    qdrant = AsyncQdrantClient(url=settings.qdrant_url)
+    qdrant = make_qdrant_client(settings)
     try:
         batch_size = 100
         for i in range(0, len(points), batch_size):
@@ -100,7 +100,7 @@ async def index_chunks(chunks: list[ChunkPayload]) -> int:
 async def delete_doc_chunks(doc_id: str) -> int:
     """Remove all chunks for a document (for re-ingestion)."""
     settings = get_settings()
-    qdrant = AsyncQdrantClient(url=settings.qdrant_url)
+    qdrant = make_qdrant_client(settings)
     try:
         from qdrant_client.models import Filter, FieldCondition, MatchValue
         result = await qdrant.delete(
@@ -118,7 +118,7 @@ async def delete_doc_chunks(doc_id: str) -> int:
 async def get_collection_stats() -> dict:
     """Return collection info for /stats endpoint."""
     settings = get_settings()
-    qdrant = AsyncQdrantClient(url=settings.qdrant_url)
+    qdrant = make_qdrant_client(settings)
     try:
         info = await qdrant.get_collection(settings.qdrant_collection)
         total = int(info.points_count or 0)

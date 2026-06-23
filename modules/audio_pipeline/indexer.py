@@ -26,7 +26,7 @@ import uuid
 from pathlib import Path
 from typing import Any
 
-from qdrant_client import AsyncQdrantClient
+from api.core.qdrant import make_qdrant_client
 from qdrant_client.models import (
     Distance,
     FieldCondition,
@@ -89,7 +89,7 @@ def _point_id_issue(source_file_hash: str, call_id: str) -> str:
 async def ensure_audio_collection(collection_name: str, *, dim: int) -> None:
     """Create a dense-only cosine collection for call embeddings (same dim as corpus embedder)."""
     settings = get_settings()
-    qdrant = AsyncQdrantClient(url=settings.qdrant_url)
+    qdrant = make_qdrant_client(settings)
     try:
         cols = await qdrant.get_collections()
         names = [c.name for c in cols.collections]
@@ -405,7 +405,7 @@ async def async_main() -> int:
     embedder = get_embedder()
     conn = open_db(db_path)
     catalog_conn = open_catalog_db(catalog_path)
-    qdrant = AsyncQdrantClient(url=settings.qdrant_url)
+    qdrant = make_qdrant_client(settings)
 
     try:
         if args.hash.strip():
