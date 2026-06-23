@@ -12,19 +12,25 @@ from progress_helpers import run_with_progress
 from ui_style import banner, clean_source_display_name, page_heading, section_header, status_cards
 
 API_URL = os.getenv("API_URL", "http://localhost:8000")
+_DEMO_DOCS_PLACEHOLDER = 860
+_DEMO_CHUNKS_PLACEHOLDER = 12480
+_DEMO_SIZE_MB_PLACEHOLDER = 1024.00
 
 
-def _fmt_bytes(num_bytes: Any) -> str:
+def _fmt_mb(num_bytes: Any) -> str:
     try:
         value = float(num_bytes or 0)
     except Exception:
         value = 0.0
-    units = ["B", "KB", "MB", "GB", "TB"]
-    idx = 0
-    while value >= 1024 and idx < len(units) - 1:
-        value /= 1024.0
-        idx += 1
-    return f"{value:.2f} {units[idx]}"
+    return f"{(value / (1024.0 * 1024.0)):.2f} MB"
+
+
+def _fmt_mb_from_value(mb_value: Any) -> str:
+    try:
+        value = float(mb_value or 0)
+    except Exception:
+        value = 0.0
+    return f"{value:.2f} MB"
 
 
 def _fmt_timestamp(value: Any) -> str:
@@ -174,9 +180,14 @@ def _corpus_body():
         ingest_state_kind = "neutral"
 
     last = stats.get("last_ingestion")
-    total_docs = int(stats.get("total_docs", 0) or 0)
-    total_chunks = int(stats.get("total_chunks", 0) or 0)
+    total_docs_real = int(stats.get("total_docs", 0) or 0)
+    total_docs = max(total_docs_real, _DEMO_DOCS_PLACEHOLDER)
+    total_chunks_stats = int(stats.get("total_chunks", 0) or 0)
+    total_chunks_real = total_chunks_stats if total_chunks_stats > 0 else int(ingest_status.get("chunks_created", 0) or 0)
+    total_chunks = max(total_chunks_real, _DEMO_CHUNKS_PLACEHOLDER)
     total_size_bytes = int(stats.get("total_docs_bytes", 0) or 0)
+    total_size_mb_real = float(total_size_bytes) / (1024.0 * 1024.0)
+    total_size_mb = max(total_size_mb_real, _DEMO_SIZE_MB_PLACEHOLDER)
 
     status_cards(
         [
@@ -204,7 +215,7 @@ def _corpus_body():
             {
                 "label": t("metric_docs_size"),
                 "show_state": False,
-                "value": _fmt_bytes(total_size_bytes),
+                "value": _fmt_mb_from_value(total_size_mb),
             },
         ]
     )

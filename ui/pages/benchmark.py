@@ -21,6 +21,7 @@ from ui_style import LOGO_PATH, banner, page_heading, section_header
 API_URL = os.getenv("API_URL", "http://localhost:8000")
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _DOTENV_PATH = _REPO_ROOT / ".env"
+_BENCHMARK_TENANT = "demo"
 
 
 def _read_env_file(path: Path) -> dict[str, str]:
@@ -336,8 +337,28 @@ def _display_analyze_from_job(j: dict) -> None:
         st.rerun()
 
 
+def _post_review(pair_index: int, action: str, edited: str | None, notes: str | None) -> None:
+    body = {
+        "pair_index": pair_index,
+        "action": action,
+        "edited_answer": edited,
+        "notes": notes,
+    }
+
+    def _send():
+        r = httpx.post(
+            f"{API_URL}/benchmark/review",
+            json=body,
+            headers=_admin_headers(),
+            timeout=30,
+        )
+        r.raise_for_status()
+        return True
+
+    run_with_progress(t("page_loading"), _send)
+
+
 def _benchmark_body():
-    bench_tenant = st.text_input(t("benchmark_tenant_id"), value="demo", key="bench_tenant")
     st.caption(t("benchmark_eval_pipeline_note"))
     with st.expander("Advanced options", expanded=False):
         batch_size = st.number_input(
@@ -365,8 +386,8 @@ def _benchmark_body():
     _maybe_run_job_step()
 
     j = st.session_state.get(JOB_KEY)
-    tab_eval, tab_analyze, tab_generate = st.tabs(
-        [t("benchmark_eval_section"), t("benchmark_analyze"), t("benchmark_generate_btn")]
+    tab_eval, tab_analyze, tab_generate, tab_review = st.tabs(
+        [t("benchmark_eval_section"), t("benchmark_analyze"), t("benchmark_generate_btn"), t("page_review")]
     )
 
     with tab_eval:
@@ -374,7 +395,7 @@ def _benchmark_body():
         c1, c2 = st.columns(2)
         with c1:
             if st.button(t("benchmark_run"), type="primary", icon=":material/play_arrow:"):
-                tid = bench_tenant.strip() or "demo"
+                tid = _BENCHMARK_TENANT
 
                 def _run_eval():
                     with _httpx_client() as client:
@@ -400,7 +421,7 @@ def _benchmark_body():
                     banner(f"{t('benchmark_error')}: {e}", variant="error", icon_name="error")
         with c2:
             if st.button(t("benchmark_run_stepped"), icon=":material/view_timeline:"):
-                tid = bench_tenant.strip() or "demo"
+                tid = _BENCHMARK_TENANT
                 st.session_state[JOB_KEY] = {
                     "type": "eval",
                     "paused": False,
@@ -447,7 +468,7 @@ def _benchmark_body():
         a1, a2 = st.columns(2)
         with a1:
             if st.button(t("benchmark_analyze"), key="btn_analyze_once", icon=":material/bug_report:"):
-                tid = bench_tenant.strip() or "demo"
+                tid = _BENCHMARK_TENANT
 
                 def _analyze():
                     p = {
@@ -477,7 +498,7 @@ def _benchmark_body():
                     banner(f"{t('benchmark_error')}: {e}", variant="error", icon_name="error")
         with a2:
             if st.button(t("benchmark_analyze_stepped"), key="btn_analyze_step", icon=":material/view_timeline:"):
-                tid = bench_tenant.strip() or "demo"
+                tid = _BENCHMARK_TENANT
                 st.session_state[JOB_KEY] = {
                     "type": "analyze",
                     "paused": False,
@@ -537,7 +558,7 @@ def _benchmark_body():
         g_once, g_step = st.columns(2)
         with g_once:
             if st.button(t("benchmark_generate_btn"), icon=":material/auto_awesome:"):
-                tenant = bench_tenant.strip() or "demo"
+                tenant = _BENCHMARK_TENANT
                 n_pairs = int(max_pairs)
 
                 def _gen():
@@ -563,7 +584,7 @@ def _benchmark_body():
                     banner(f"{t('benchmark_error')}: {e}", variant="error", icon_name="error")
         with g_step:
             if st.button(t("benchmark_generate_stepped"), icon=":material/view_timeline:"):
-                tenant = bench_tenant.strip() or "demo"
+                tenant = _BENCHMARK_TENANT
                 st.session_state[JOB_KEY] = {
                     "type": "gen",
                     "paused": False,
@@ -592,6 +613,68 @@ def _benchmark_body():
                 if st.button(t("benchmark_dismiss_job"), key="dismiss_gen_job"):
                     st.session_state.pop(JOB_KEY, None)
                     st.rerun()
+
+    with tab_review:
+        section_header(t("review_title"), "fact_check")
+        r1, r2 = st.columns(2)
+        with r1:
+            offset = st.number_input(t("review_offset"), min_value=0, value=0, step=1, key="bench_review_offset")
+        with r2:
+            limit = st.number_input(t("review_limit"), min_value=1, max_value=50, value=5, step=1, key="bench_review_limit")
+
+        if st.button(t("review_load"), icon=":material/folder_open:", key="bench_review_load"):
+            off = int(offset)
+            lim = int(limit)
+
+            def _load_pairs():
+                r = httpx.get(
+                    f"{API_URL}/benchmark/pairs",
+                    params={"offset": off, "limit": lim},
+                    headers=_admin_headers(),
+                    timeout=60,
+                )
+                r.raise_for_status()
+                return r.json()
+
+            try:
+                st.session_state["bench_review_batch"] = run_with_progress(t("page_loading"), _load_pairs)
+            except Exception as e:
+                banner(f"{t('error')}: {e}", variant="error", icon_name="error")
+
+        batch = st.session_state.get("bench_review_batch")
+        if batch:
+            st.caption(t("review_total").format(n=batch.get("total", 0)))
+            for p in batch.get("pairs", []):
+                idx = p.get("_line_index", 0)
+                with st.expander(f"#{idx} — {p.get('question', '')[:80]}…"):
+                    st.markdown(f"**{t('review_question')}** {p.get('question', '')}")
+                    st.markdown(f"**{t('review_answer')}** {p.get('answer', '')}")
+                    prev = p.get("chunk_text_preview") or ""
+                    if prev:
+                        st.text_area(t("review_chunk_preview"), prev, height=160, disabled=True, key=f"bench_ch_{idx}")
+                    hn1 = p.get("hard_neg_a")
+                    hn2 = p.get("hard_neg_b")
+                    if hn1 or hn2:
+                        st.markdown(f"**{t('review_hard_neg')}**")
+                        if hn1:
+                            st.caption(hn1[:600])
+                        if hn2:
+                            st.caption(hn2[:600])
+                    edit = st.text_input(t("review_edited_answer"), key=f"bench_ed_{idx}", value="")
+                    notes = st.text_input(t("review_notes"), key=f"bench_nt_{idx}", value="")
+                    c1, c2 = st.columns(2)
+                    if c1.button(t("review_accept"), key=f"bench_a_{idx}", icon=":material/check:"):
+                        try:
+                            _post_review(idx, "accept", edit or None, notes or None)
+                            banner(t("review_stored"), variant="ok", icon_name="save")
+                        except Exception as e:
+                            banner(f"{t('error')}: {e}", variant="error", icon_name="error")
+                    if c2.button(t("review_reject"), key=f"bench_r_{idx}", icon=":material/close:"):
+                        try:
+                            _post_review(idx, "reject", edit or None, notes or None)
+                            banner(t("review_stored"), variant="ok", icon_name="save")
+                        except Exception as e:
+                            banner(f"{t('error')}: {e}", variant="error", icon_name="error")
 
 
 _benchmark_body()

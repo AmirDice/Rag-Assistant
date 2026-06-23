@@ -15,6 +15,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY api/ ./api/
+COPY modules/ ./modules/
 COPY classification/classifier/ ./classification/classifier/
 COPY config/ ./config/
 

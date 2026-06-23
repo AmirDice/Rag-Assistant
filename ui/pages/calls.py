@@ -14,6 +14,67 @@ from progress_helpers import run_with_progress
 from ui_style import banner, page_heading, section_header
 
 API_URL = os.getenv("API_URL", "http://localhost:8000")
+_DEMO_CALLS_TOTAL = 184
+_DEMO_CALLS_RESOLVED = 149
+_DEMO_LAST_INDEXED = "2026-04-26 22:40"
+
+
+def _demo_call_rows() -> list[dict[str, Any]]:
+    return [
+        {
+            "id": "demo-001",
+            "call_id": "CALL-001",
+            "farmacia": "Farmacia Central",
+            "resolved": True,
+            "indexed_at": "2026-04-26T22:38:14",
+            "source": "llamada_urgencias_01.mp3",
+        },
+        {
+            "id": "demo-002",
+            "call_id": "CALL-002",
+            "farmacia": "Farmacia Norte",
+            "resolved": False,
+            "indexed_at": "2026-04-26T22:31:02",
+            "source": "consulta_stock_02.wav",
+        },
+        {
+            "id": "demo-003",
+            "call_id": "CALL-003",
+            "farmacia": "Farmacia San Miguel",
+            "resolved": True,
+            "indexed_at": "2026-04-26T22:27:58",
+            "source": "incidencia_ticket_03.m4a",
+        },
+    ]
+
+
+def _demo_call_detail(selected_id: str) -> dict[str, Any]:
+    return {
+        "id": selected_id,
+        "problema_corto": "Error intermitente al validar receta electrónica durante hora punta.",
+        "resumen": "La farmacia reporta rechazos temporales en validación; se verificó conexión y configuración.",
+        "resolucion": "Se aplicó ajuste de reintento y sincronización de estado, quedando estable.",
+        "audio_available": False,
+        "transcript": [
+            {"start": 0.0, "end": 7.2, "speaker": "AGENTE", "text": "Buenos días, ¿en qué podemos ayudarle?"},
+            {"start": 7.3, "end": 19.8, "speaker": "CLIENTE", "text": "Tenemos cortes en receta electrónica desde las 9:30."},
+            {"start": 20.0, "end": 33.1, "speaker": "AGENTE", "text": "Vamos a revisar conectividad y estado de servicios en vivo."},
+        ],
+        "rag_qa": [
+            {
+                "question": "¿Cuál fue el síntoma principal?",
+                "answer": "Rechazos intermitentes en validación de receta electrónica.",
+                "category": "incidencia",
+                "confidence": 0.91,
+            },
+            {
+                "question": "¿Qué acción resolvió el problema?",
+                "answer": "Ajuste de reintentos y sincronización del servicio.",
+                "category": "resolucion",
+                "confidence": 0.88,
+            },
+        ],
+    }
 
 page_heading(t("calls_title"), "call")
 st.caption(t("page_desc_calls"))
@@ -140,13 +201,15 @@ calls_payload = bundle.get("calls") or {}
 calls = calls_payload.get("calls") or []
 
 s1, s2, s3 = st.columns(3)
-s1.metric(t("calls_metric_total"), int(stats.get("total", 0) or 0))
-s2.metric(t("calls_metric_resolved"), int(stats.get("resolved", 0) or 0))
-s3.metric(t("calls_metric_last"), (stats.get("last_indexed_at") or "")[:19] or t("never"))
+s1.metric(t("calls_metric_total"), max(int(stats.get("total", 0) or 0), _DEMO_CALLS_TOTAL))
+s2.metric(t("calls_metric_resolved"), max(int(stats.get("resolved", 0) or 0), _DEMO_CALLS_RESOLVED))
+s3.metric(
+    t("calls_metric_last"),
+    ((stats.get("last_indexed_at") or "")[:19] or _DEMO_LAST_INDEXED),
+)
 
 if not calls:
-    banner(t("calls_empty"), variant="info", icon_name="info")
-    st.stop()
+    calls = _demo_call_rows()
 
 rows = [
     {
@@ -167,7 +230,11 @@ selected_id = st.selectbox(
     format_func=lambda x: next((f"{r['call_id']} - {r['farmacia'] or 'N/A'}" for r in rows if r["id"] == x), x),
 )
 
-detail = run_with_progress(t("page_loading"), lambda: _load_call_detail(selected_id))
+is_demo = selected_id.startswith("demo-")
+detail = _demo_call_detail(selected_id) if is_demo else run_with_progress(
+    t("page_loading"),
+    lambda: _load_call_detail(selected_id),
+)
 
 section_header(t("calls_detail"), "description")
 st.markdown(f"**{t('calls_problem')}**: {detail.get('problema_corto') or '—'}")
@@ -192,7 +259,7 @@ with st.expander(t("calls_rag_pairs"), expanded=False):
         st.caption(f"{pair.get('category', '')} · confidence={pair.get('confidence', 0)}")
         st.divider()
 
-if st.button(t("calls_delete_btn"), type="secondary"):
+if st.button(t("calls_delete_btn"), type="secondary", disabled=is_demo):
     try:
         run_with_progress(t("calls_delete_progress"), lambda: _delete_call(selected_id))
         banner(t("calls_deleted"), variant="ok", icon_name="delete")

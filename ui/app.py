@@ -45,7 +45,12 @@ pg = st.navigation([
 
     # Evaluation and operations
     st.Page("pages/benchmark.py", title=t("page_benchmark"), icon=":material/analytics:"),
-    st.Page("pages/benchmark_review.py", title=t("page_review"), icon=":material/fact_check:"),
+    st.Page("pages/feedback_review.py", title=t("page_feedback_review"), icon=":material/rate_review:"),
+    st.Page(
+        "pages/glossary.py",
+        title=("Glosario" if st.session_state.get("ui_lang", "en") == "es" else "Glossary"),
+        icon=":material/menu_book:",
+    ),
     st.Page("pages/onboarding.py", title=t("page_onboarding"), icon=":material/domain:"),
     st.Page("pages/settings.py", title=t("page_settings"), icon=":material/settings:"),
 ])
