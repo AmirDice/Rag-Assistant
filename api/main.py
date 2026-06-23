@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from api.routes import query, ingest, feedback, admin, benchmark, tenant, ui_config, calls
+from api.routes import query, ingest, feedback, admin, benchmark, tenant, ui_config, calls, admin_glossary
 from api.core.cache import get_cache
 from api.core.settings import get_settings
 from api.core.security import InMemoryRateLimiter, require_admin_token
@@ -79,6 +79,7 @@ app.include_router(benchmark.router, tags=["benchmark"], dependencies=[Depends(r
 app.include_router(tenant.router)
 app.include_router(ui_config.router, tags=["config"], dependencies=[Depends(require_admin_token)])
 app.include_router(calls.router, tags=["calls"])
+app.include_router(admin_glossary.router, tags=["glossary"], dependencies=[Depends(require_admin_token)])
 
 settings = get_settings()
 from pathlib import Path
