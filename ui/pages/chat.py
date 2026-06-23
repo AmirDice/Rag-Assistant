@@ -20,13 +20,78 @@ from ui_style import (
 
 API_URL = os.getenv("API_URL", "http://localhost:8000")
 
-# Must match ``api.core.generation_catalog.GENERATION_MODEL_IDS`` (UI cannot import ``api`` in Docker).
+# Must match ``api.core.generation_catalog`` available_models ids (UI cannot import ``api`` in Docker).
 _VALID_UI_GENERATION_MODELS = frozenset({
     "gemini-2.5-flash-lite",
     "gemini-2.5-flash",
     "gpt-4",
     "gpt-4o-mini",
+    "llama3.1-local",
 })
+
+# Local labels for the answer-meta surfaces (kept here so we don't touch i18n.py).
+_SURFACE_LABELS = {
+    "es": {
+        "grounded_ok": "Verificado: respaldado por las fuentes",
+        "grounded_low": "Atención: respaldo débil en las fuentes",
+        "coverage": "cobertura",
+        "est_cost": "Coste estimado",
+        "query_understanding": "Procesado de la consulta",
+        "matched_terms": "Términos del glosario detectados",
+        "retrieval_query": "Consulta usada en la búsqueda",
+        "clarification": "Necesito una aclaración",
+    },
+    "en": {
+        "grounded_ok": "Verified: supported by sources",
+        "grounded_low": "Heads up: weak support in sources",
+        "coverage": "coverage",
+        "est_cost": "Estimated cost",
+        "query_understanding": "Query processing",
+        "matched_terms": "Glossary terms detected",
+        "retrieval_query": "Query used for search",
+        "clarification": "I need a clarification",
+    },
+}
+
+
+def _lbl(key: str) -> str:
+    lang = st.session_state.get("ui_lang", "en")
+    return _SURFACE_LABELS.get(lang, _SURFACE_LABELS["en"]).get(key, key)
+
+
+def _render_answer_meta(resp: dict) -> None:
+    """Surface grounding, estimated cost, and query-processing transparency."""
+    grounded = resp.get("grounded")
+    if grounded is not None:
+        ratio = resp.get("grounding_ratio")
+        ratio_txt = ""
+        if ratio is not None:
+            try:
+                ratio_txt = f" ({_lbl('coverage')}: {int(round(float(ratio) * 100))}%)"
+            except (TypeError, ValueError):
+                ratio_txt = ""
+        if grounded:
+            st.caption(f":green[●] {_lbl('grounded_ok')}{ratio_txt}")
+        else:
+            st.caption(f":orange[●] {_lbl('grounded_low')}{ratio_txt}")
+
+    try:
+        cost = float(resp.get("total_estimated_cost") or 0.0)
+    except (TypeError, ValueError):
+        cost = 0.0
+    if cost > 0:
+        cur = resp.get("cost_currency") or "USD"
+        st.caption(f":material/payments: {_lbl('est_cost')}: ~{cost:.6f} {cur}")
+
+    matched = resp.get("matched_terms") or []
+    orig = (resp.get("original_query") or "").strip()
+    rq = (resp.get("retrieval_query") or "").strip()
+    if matched or (rq and rq.lower() != orig.lower()):
+        with st.expander(_lbl("query_understanding")):
+            if matched:
+                st.markdown(f"**{_lbl('matched_terms')}:** " + ", ".join(matched))
+            if rq and rq.lower() != orig.lower():
+                st.markdown(f"**{_lbl('retrieval_query')}:** {rq}")
 
 
 def _ensure_ui_prefs_loaded() -> None:
@@ -440,6 +505,12 @@ def render_response(resp: dict, *, gallery_key_suffix: str = "") -> None:
     if resp.get("cache_hit"):
         st.info(t("cache_hit"), icon=":material/bolt:")
 
+    # Intent planner asked for clarification instead of answering.
+    if resp.get("message_type") == "clarification_question" or resp.get("needs_clarification"):
+        question = _clean_chunk_text(resp.get("synthesized_answer") or "")
+        st.info(f"**{_lbl('clarification')}**\n\n{question}", icon=":material/help:")
+        return
+
     chunks = resp.get("answer_chunks") or []
     synth_raw = resp.get("synthesized_answer") or ""
     image_paths = _collect_image_paths(synth_raw, chunks)
@@ -456,6 +527,7 @@ def render_response(resp: dict, *, gallery_key_suffix: str = "") -> None:
                 for rd in resp["related_docs"]:
                     st.markdown(f"- **{rd['doc']}** — {rd['relevance']}")
         _render_chat_image_gallery(image_paths, qkey)
+        _render_answer_meta(resp)
         render_feedback(resp.get("query_id", ""))
         return
 
@@ -490,6 +562,7 @@ def render_response(resp: dict, *, gallery_key_suffix: str = "") -> None:
             for rd in resp["related_docs"]:
                 st.markdown(f"- **{rd['doc']}** — {rd['relevance']}")
 
+    _render_answer_meta(resp)
     render_feedback(resp.get("query_id", ""))
 
 
