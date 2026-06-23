@@ -126,6 +126,11 @@ class PDFConverter:
         md_text = _clean_pymupdf_markers(md_text)
 
         from api.pipeline.logo_filter import is_logo_pil
+        from api.pipeline.pdf_image_prefilter import (
+            should_skip_pdf_image_layout,
+            should_skip_pdf_image_metadata,
+            should_skip_pdf_image_text_proximity,
+        )
 
         media_dir.mkdir(parents=True, exist_ok=True)
         for page_num, page in enumerate(doc):
@@ -133,8 +138,29 @@ class PDFConverter:
                 continue
 
             page_width = page.rect.width
+            page_rect = page.rect
+            page_words = page.get_text("words")
             for img_idx, img in enumerate(page.get_images(full=True)):
                 xref = img[0]
+                # Cheap geometric prefilter: drop headers/footers/margins/
+                # full-page backgrounds/orphan ornaments BEFORE decoding.
+                meta_w = int(img[2]) if len(img) > 2 else 0
+                meta_h = int(img[3]) if len(img) > 3 else 0
+                try:
+                    rects0 = page.get_image_rects(xref)
+                    rect0 = rects0[0] if rects0 else None
+                except Exception:
+                    rect0 = None
+                skip_reason = (
+                    should_skip_pdf_image_metadata(meta_w, meta_h)
+                    or should_skip_pdf_image_layout(rect0, page_rect, meta_w, meta_h)
+                    or should_skip_pdf_image_text_proximity(rect0, page_rect, page_words)
+                )
+                if skip_reason:
+                    logger.debug(
+                        "Prefilter skip xref=%d page=%d reason=%s", xref, page_num, skip_reason
+                    )
+                    continue
                 try:
                     pix = pymupdf.Pixmap(doc, xref)
                     if pix.width < 15 or pix.height < 10:
