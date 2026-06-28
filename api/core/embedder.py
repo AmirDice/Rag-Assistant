@@ -148,21 +148,74 @@ class OpenAICompatibleEmbedder(Embedder):
             return [item["embedding"] for item in data["data"]]
 
 
+class FallbackEmbedder(Embedder):
+    """Try a primary embedder; on failure use a fallback.
+
+    Both providers MUST produce the same vector dimension — otherwise the
+    fallback vectors are incompatible with the Qdrant collection. We log a loud
+    warning if the configured dimensions differ.
+    """
+
+    def __init__(self, primary: Embedder, fallback: Embedder, *, primary_name: str, fallback_name: str) -> None:
+        self._primary = primary
+        self._fallback = fallback
+        self._primary_name = primary_name
+        self._fallback_name = fallback_name
+
+    async def embed(self, texts: list[str]) -> list[list[float]]:
+        try:
+            return await self._primary.embed(texts)
+        except Exception as e:
+            logger.warning("Embedder '%s' failed (%s) — falling back to '%s'", self._primary_name, e, self._fallback_name)
+            return await self._fallback.embed(texts)
+
+    async def embed_query(self, query: str) -> list[float]:
+        try:
+            return await self._primary.embed_query(query)
+        except Exception as e:
+            logger.warning("Embedder '%s' failed (%s) — falling back to '%s'", self._primary_name, e, self._fallback_name)
+            return await self._fallback.embed_query(query)
+
+
+def _build_embedder(name: str) -> Embedder:
+    if name == "voyage":
+        return VoyageEmbedder()
+    if name == "qwen3":
+        return OpenAICompatibleEmbedder()
+    raise ValueError(f"Unknown embedding provider: {name}")
+
+
 _embedder_instance: Embedder | None = None
 
 
 def get_embedder() -> Embedder:
     global _embedder_instance
-    if _embedder_instance is None:
-        settings = get_settings()
-        cfg = settings.models_config()
-        active = cfg["embedding"]["active"]
-        if active == "voyage":
-            _embedder_instance = VoyageEmbedder()
-        elif active == "qwen3":
-            _embedder_instance = OpenAICompatibleEmbedder()
+    if _embedder_instance is not None:
+        return _embedder_instance
+
+    cfg = get_settings().models_config()["embedding"]
+    active = cfg["active"]
+    primary = _build_embedder(active)
+
+    fb_name = str(cfg.get("fallback") or "").strip()
+    if fb_name and fb_name != active:
+        # Same-dimension requirement: warn if the configured dims differ.
+        dim_a = int(cfg.get(active, {}).get("dimensions", 1024))
+        dim_b = int(cfg.get(fb_name, {}).get("dimensions", 1024))
+        if dim_a != dim_b:
+            logger.warning(
+                "Embedding fallback '%s' (dim %d) differs from primary '%s' (dim %d) — "
+                "vectors would be incompatible; fallback disabled.",
+                fb_name, dim_b, active, dim_a,
+            )
+            _embedder_instance = primary
         else:
-            raise ValueError(f"Unknown embedding provider: {active}")
+            _embedder_instance = FallbackEmbedder(
+                primary, _build_embedder(fb_name), primary_name=active, fallback_name=fb_name
+            )
+            logger.info("Embedder initialized: %s (fallback: %s)", active, fb_name)
+    else:
+        _embedder_instance = primary
         logger.info("Embedder initialized: %s", active)
     return _embedder_instance
 

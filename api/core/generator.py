@@ -63,6 +63,16 @@ def _build_context(chunks: list[AnswerChunk]) -> str:
     return "\n\n---\n\n".join(parts)
 
 
+def _fallback_model_id() -> str:
+    """Catalog id to try when the primary generation model fails (config:
+    generation.fallback_model). Empty = no fallback."""
+    try:
+        gen = get_settings().models_config().get("generation", {}) or {}
+        return str(gen.get("fallback_model") or "").strip()
+    except Exception:
+        return ""
+
+
 async def generate_answer(
     question: str,
     chunks: list[AnswerChunk],
@@ -78,7 +88,7 @@ async def generate_answer(
     retrieved chunks.
     """
     from api.core.backends import build_generation_backend
-    from api.core.generation_catalog import generation_model_config
+    from api.core.generation_catalog import generation_model_config, resolve_generation_model_id
     from api.core.cost_meter import price_generation, record_cost_event
 
     settings = get_settings()
@@ -91,43 +101,56 @@ async def generate_answer(
         f"---\n\nUser question: {question}"
     )
     system_prompt = _system_prompt()
-    model_cfg = generation_model_config(generation_model)
 
-    try:
-        backend = build_generation_backend(settings, model_cfg)
-        result = await backend.generate(prompt=system_prompt, chunks=[user_message], images=None)
-        answer = (result.text or "").strip()
-        priced = price_generation(
-            provider=result.provider,
-            model=result.model,
-            units_in=result.units_in,
-            units_out=result.units_out,
-            units_thoughts=result.units_thoughts,
-        )
-        record_cost_event(priced)
-        logger.info(
-            "Generated answer: %d chars via %s/%s (units_in=%.0f units_out=%.0f basis=%s cost=%.6f %s)",
-            len(answer),
-            result.provider,
-            result.model,
-            result.units_in,
-            result.units_out,
-            result.units_basis,
-            priced["estimated_cost"],
-            priced["currency"],
-        )
-        return GeneratedAnswer(
-            text=answer,
-            provider=result.provider,
-            model=result.model,
-            units_in=result.units_in,
-            units_out=result.units_out,
-            units_thoughts=result.units_thoughts,
-            units_basis=result.units_basis,
-            estimated_cost=float(priced["estimated_cost"]),
-            cost_currency=str(priced["currency"]),
-            cost_breakdown={"generation": priced},
-        )
-    except Exception as e:
-        logger.error("Answer generation failed (%s/%s): %s", model_cfg.provider, model_cfg.model, e)
-        return GeneratedAnswer(text="")
+    # Ordered model chain: requested (or default) → configured fallback. If the
+    # primary errors or returns nothing (e.g. a 503), the next model is tried.
+    chain = [resolve_generation_model_id(generation_model)]
+    fb = _fallback_model_id()
+    if fb and fb not in chain:
+        chain.append(fb)
+
+    last_error: Exception | None = None
+    for attempt, model_id in enumerate(chain):
+        model_cfg = generation_model_config(model_id)
+        try:
+            backend = build_generation_backend(settings, model_cfg)
+            result = await backend.generate(prompt=system_prompt, chunks=[user_message], images=None)
+            answer = (result.text or "").strip()
+            if not answer:
+                raise RuntimeError("empty generation")
+            priced = price_generation(
+                provider=result.provider,
+                model=result.model,
+                units_in=result.units_in,
+                units_out=result.units_out,
+                units_thoughts=result.units_thoughts,
+            )
+            record_cost_event(priced)
+            if attempt > 0:
+                logger.info("Generation fell back to %s after primary failed", result.model)
+            logger.info(
+                "Generated answer: %d chars via %s/%s (units_in=%.0f units_out=%.0f basis=%s cost=%.6f %s)",
+                len(answer), result.provider, result.model,
+                result.units_in, result.units_out, result.units_basis,
+                priced["estimated_cost"], priced["currency"],
+            )
+            return GeneratedAnswer(
+                text=answer,
+                provider=result.provider,
+                model=result.model,
+                units_in=result.units_in,
+                units_out=result.units_out,
+                units_thoughts=result.units_thoughts,
+                units_basis=result.units_basis,
+                estimated_cost=float(priced["estimated_cost"]),
+                cost_currency=str(priced["currency"]),
+                cost_breakdown={"generation": priced, "fell_back": attempt > 0},
+            )
+        except Exception as e:
+            last_error = e
+            logger.warning(
+                "Generation attempt %d/%d via %s/%s failed: %s",
+                attempt + 1, len(chain), model_cfg.provider, model_cfg.model, e,
+            )
+    logger.error("All generation attempts failed: %s", last_error)
+    return GeneratedAnswer(text="")

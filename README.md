@@ -1,8 +1,9 @@
-# RAG Assistant
+# Grounded RAG
 
-Retrieval-augmented Q&A over your documents — a FastAPI backend + Streamlit UI with
-provider-agnostic generation, a post-generation grounding check, glossary-aware query
-preprocessing, and built-in cost/usage tracking.
+Retrieval-augmented Q&A that **cites its sources and verifies its own answers** — a FastAPI
+backend + Streamlit UI with provider-agnostic generation (with model fallback), a
+post-generation grounding check, glossary-aware query preprocessing, and a built-in
+usage/cost dashboard.
 
 ## Features
 

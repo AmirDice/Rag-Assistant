@@ -3,6 +3,7 @@
 
 embedding:
   active: "voyage"   # voyage | qwen3
+  fallback: ""       # optional same-dimension provider to use if `active` fails (e.g. qwen3)
 
   voyage:
     model: "voyage-4-large"
@@ -54,6 +55,7 @@ retrieval:
 # name) instead of being written here.
 generation:
   default_model: "gemini-2.5-flash-lite"
+  fallback_model: "gemini-2.5-flash"   # tried if the primary model errors / returns nothing
   model: "gemini-2.5-flash-lite"   # legacy alias still read by model_names.gemini_generation_model()
   available_models:
     gemini-2.5-flash-lite:

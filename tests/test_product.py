@@ -8,7 +8,7 @@ from api.core import product as prod
 def test_product_labels_default():
     prod.clear_product_cache()
     p = prod.product_labels()
-    assert p["short_name"] == "RAG Assistant"
+    assert p["short_name"] == "Grounded RAG"
     assert "document" in p["erp_context_es"].lower() or "index" in p["erp_context_es"].lower()
 
 
