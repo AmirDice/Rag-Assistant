@@ -51,6 +51,11 @@ pg = st.navigation([
         title=("Glosario" if st.session_state.get("ui_lang", "en") == "es" else "Glossary"),
         icon=":material/menu_book:",
     ),
+    st.Page(
+        "pages/management.py",
+        title=("Uso y costes" if st.session_state.get("ui_lang", "en") == "es" else "Usage & cost"),
+        icon=":material/monitoring:",
+    ),
     st.Page("pages/onboarding.py", title=t("page_onboarding"), icon=":material/domain:"),
     st.Page("pages/settings.py", title=t("page_settings"), icon=":material/settings:"),
 ])

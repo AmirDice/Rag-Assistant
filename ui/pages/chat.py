@@ -40,6 +40,11 @@ _SURFACE_LABELS = {
         "matched_terms": "Términos del glosario detectados",
         "retrieval_query": "Consulta usada en la búsqueda",
         "clarification": "Necesito una aclaración",
+        "new_chat": "Nuevo chat",
+        "your_chats": "Conversación",
+        "chat_default_title": "Nuevo chat",
+        "delete_chat": "Eliminar",
+        "empty_hint": "Escribe tu pregunta abajo para empezar.",
     },
     "en": {
         "grounded_ok": "Verified: supported by sources",
@@ -50,6 +55,11 @@ _SURFACE_LABELS = {
         "matched_terms": "Glossary terms detected",
         "retrieval_query": "Query used for search",
         "clarification": "I need a clarification",
+        "new_chat": "New chat",
+        "your_chats": "Conversation",
+        "chat_default_title": "New chat",
+        "delete_chat": "Delete",
+        "empty_hint": "Type your question below to get started.",
     },
 }
 
@@ -60,28 +70,21 @@ def _lbl(key: str) -> str:
 
 
 def _render_answer_meta(resp: dict) -> None:
-    """Surface grounding, estimated cost, and query-processing transparency."""
+    """Subtle grounding line + a small query-processing note. (Cost lives on the
+    Usage dashboard, not inline in chat.)"""
     grounded = resp.get("grounded")
     if grounded is not None:
         ratio = resp.get("grounding_ratio")
         ratio_txt = ""
         if ratio is not None:
             try:
-                ratio_txt = f" ({_lbl('coverage')}: {int(round(float(ratio) * 100))}%)"
+                ratio_txt = f" · {int(round(float(ratio) * 100))}% {_lbl('coverage')}"
             except (TypeError, ValueError):
                 ratio_txt = ""
         if grounded:
             st.caption(f":green[●] {_lbl('grounded_ok')}{ratio_txt}")
         else:
             st.caption(f":orange[●] {_lbl('grounded_low')}{ratio_txt}")
-
-    try:
-        cost = float(resp.get("total_estimated_cost") or 0.0)
-    except (TypeError, ValueError):
-        cost = 0.0
-    if cost > 0:
-        cur = resp.get("cost_currency") or "USD"
-        st.caption(f":material/payments: {_lbl('est_cost')}: ~{cost:.6f} {cur}")
 
     matched = resp.get("matched_terms") or []
     orig = (resp.get("original_query") or "").strip()
@@ -92,6 +95,27 @@ def _render_answer_meta(resp: dict) -> None:
                 st.markdown(f"**{_lbl('matched_terms')}:** " + ", ".join(matched))
             if rq and rq.lower() != orig.lower():
                 st.markdown(f"**{_lbl('retrieval_query')}:** {rq}")
+
+
+def _render_sources_expander(chunks: list[dict], query_id: str) -> None:
+    """All retrieved chunks in ONE tidy expander — replaces the bordered-card grid."""
+    if not chunks:
+        return
+    top_score = float(chunks[0].get("score") or 0.0)
+    key_base = _widget_key_safe(query_id)
+    with st.expander(f":material/menu_book: {t('sources_panel_title')} ({len(chunks)})"):
+        for i, ch in enumerate(chunks):
+            doc = clean_source_display_name(str(ch.get("source_doc") or "—")).replace("`", "'")
+            page = ch.get("source_page")
+            pct, _, _ = _relevance_pct(float(ch.get("score") or 0.0), top_score)
+            loc = f" · p.{page}" if page is not None else ""
+            st.markdown(f"**{i + 1}. {doc}**{loc}  ·  {t('relevance')} {pct}%")
+            st.caption(_snippet_plain(ch.get("text") or "", max_len=240))
+            with st.popover(t("show_more"), icon=":material/unfold_more:", key=f"src_{key_base}_{i}"):
+                st.markdown(_clean_chunk_text(ch.get("text") or ""))
+                render_citation_row(ch, t("image_badge"))
+            if i < len(chunks) - 1:
+                st.divider()
 
 
 def _ensure_ui_prefs_loaded() -> None:
@@ -501,9 +525,9 @@ def render_answer_chunk(chunk: dict, idx: int):
 
 
 def render_response(resp: dict, *, gallery_key_suffix: str = "") -> None:
-    """Synthesis + top chunk, then images, then «Fuentes consultadas» and the rest."""
+    """Clean layout: answer → grounding line → images → one Sources expander."""
     if resp.get("cache_hit"):
-        st.info(t("cache_hit"), icon=":material/bolt:")
+        st.caption(f":violet[:material/bolt:] {t('cache_hit')}")
 
     # Intent planner asked for clarification instead of answering.
     if resp.get("message_type") == "clarification_question" or resp.get("needs_clarification"):
@@ -514,56 +538,28 @@ def render_response(resp: dict, *, gallery_key_suffix: str = "") -> None:
     chunks = resp.get("answer_chunks") or []
     synth_raw = resp.get("synthesized_answer") or ""
     image_paths = _collect_image_paths(synth_raw, chunks)
-    qkey = _widget_key_safe(
-        str(resp.get("query_id") or "unknown") + str(gallery_key_suffix)
+    qkey = _widget_key_safe(str(resp.get("query_id") or "unknown") + str(gallery_key_suffix))
+
+    # Primary answer: synthesized text if present, else the top chunk.
+    answer_text = _clean_chunk_text(synth_raw) if synth_raw.strip() else (
+        _clean_chunk_text(chunks[0]["text"]) if chunks else ""
     )
+    if answer_text.strip():
+        st.markdown(answer_text)
+    elif not chunks:
+        st.caption(t("no_results"))
 
-    if not chunks:
-        synth_disp = _clean_chunk_text(synth_raw) if synth_raw else ""
-        if synth_disp.strip():
-            st.markdown(synth_disp)
-        if resp.get("related_docs"):
-            with st.expander(t("see_also")):
-                for rd in resp["related_docs"]:
-                    st.markdown(f"- **{rd['doc']}** — {rd['relevance']}")
-        _render_chat_image_gallery(image_paths, qkey)
-        _render_answer_meta(resp)
-        render_feedback(resp.get("query_id", ""))
-        return
-
-    top = chunks[0]
-    rest = chunks[1:]
-
-    # If we have synthesized text, treat it as the primary answer and keep chunks
-    # in the "Sources consulted" area so it does not look like chunk-only mode.
-    if synth_raw:
-        sd = _clean_chunk_text(synth_raw)
-        if sd.strip():
-            st.markdown(sd)
-            st.divider()
-    else:
-        render_answer_chunk(top, 0)
+    _render_answer_meta(resp)
     _render_chat_image_gallery(image_paths, qkey)
-    if synth_raw:
-        _render_secondary_sources_row(
-            chunks,
-            float(top.get("score") or 0.0),
-            str(resp.get("query_id") or "unknown"),
-        )
-    elif rest:
-        _render_secondary_sources_row(
-            rest,
-            float(top.get("score") or 0.0),
-            str(resp.get("query_id") or "unknown"),
-        )
+    _render_sources_expander(chunks, str(resp.get("query_id") or "unknown"))
 
     if resp.get("related_docs"):
         with st.expander(t("see_also")):
             for rd in resp["related_docs"]:
                 st.markdown(f"- **{rd['doc']}** — {rd['relevance']}")
 
-    _render_answer_meta(resp)
-    render_feedback(resp.get("query_id", ""))
+    if chunks or synth_raw.strip():
+        render_feedback(resp.get("query_id", ""))
 
 
 def render_feedback(query_id: str):
@@ -634,10 +630,96 @@ def _send_feedback(
         pass
 
 
+# ── Multi-chat session state ─────────────────────────────────
+
+def _new_chat() -> str:
+    """Create a fresh conversation and make it active. Returns its id."""
+    n = st.session_state.get("_chat_counter", 0)
+    st.session_state["_chat_counter"] = n + 1
+    cid = f"chat-{n}"
+    st.session_state.conversations[cid] = {"title": _lbl("chat_default_title"), "messages": []}
+    st.session_state.active_chat = cid
+    return cid
+
+
+def _init_chats() -> None:
+    if "conversations" not in st.session_state:
+        st.session_state.conversations = {}
+        st.session_state.active_chat = None
+    if not st.session_state.conversations or st.session_state.active_chat not in st.session_state.conversations:
+        _new_chat()
+
+
+def _active_conv() -> dict:
+    _init_chats()
+    return st.session_state.conversations[st.session_state.active_chat]
+
+
+def _chat_switcher() -> None:
+    """Conversation controls at the top of the Chat page (dropdown + new + delete).
+
+    Kept out of the sidebar so it doesn't compete with the app's page navigation.
+    """
+    _init_chats()
+    conv_ids = list(st.session_state.conversations.keys())
+    titles = {
+        cid: (st.session_state.conversations[cid]["title"] or _lbl("chat_default_title"))
+        for cid in conv_ids
+    }
+    c_sel, c_new, c_del = st.columns([6, 2, 2], vertical_alignment="bottom")
+    with c_sel:
+        active = st.session_state.active_chat
+        chosen = st.selectbox(
+            _lbl("your_chats"),
+            conv_ids,
+            index=conv_ids.index(active) if active in conv_ids else 0,
+            format_func=lambda c: titles.get(c, c),
+            label_visibility="collapsed",
+        )
+        if chosen != active:
+            st.session_state.active_chat = chosen
+            st.rerun()
+    with c_new:
+        if st.button(_lbl("new_chat"), icon=":material/add:", use_container_width=True, type="primary"):
+            _new_chat()
+            st.rerun()
+    with c_del:
+        if st.button(
+            _lbl("delete_chat"),
+            icon=":material/delete:",
+            use_container_width=True,
+            disabled=len(conv_ids) <= 1,
+        ):
+            st.session_state.conversations.pop(st.session_state.active_chat, None)
+            st.session_state.active_chat = next(iter(st.session_state.conversations))
+            st.rerun()
+
+
+def _prior_turns(messages: list[dict], limit: int = 3) -> list[dict]:
+    """Completed user→assistant pairs (for multi-turn context / clarification)."""
+    turns: list[dict] = []
+    pending_q: str | None = None
+    for m in messages:
+        if m["role"] == "user":
+            pending_q = m.get("content") or ""
+        elif m["role"] == "assistant" and pending_q is not None:
+            resp = m.get("response") or {}
+            ans = (resp.get("synthesized_answer") or "").strip()
+            if not ans:
+                chs = resp.get("answer_chunks") or []
+                ans = (chs[0].get("text") or "")[:500] if chs else ""
+            turns.append({"question": pending_q, "answer": ans[:1000]})
+            pending_q = None
+    return turns[-limit:]
+
+
 # ── Page layout ──────────────────────────────────────────────
 
 page_heading(t("chat_title"), "chat")
 st.caption(t("page_desc_chat"))
+
+# Conversation controls live here (top of the page), not in the sidebar.
+_chat_switcher()
 
 with st.sidebar:
     st.session_state.setdefault("tenant_id", "demo")
@@ -651,17 +733,22 @@ def _chat_body():
     _ensure_ui_prefs_loaded()
     st.session_state.setdefault("chat_generate_toggle", True)
 
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
+    conv = _active_conv()
+    messages = conv["messages"]
 
-    _CHAT_SCROLL_PX = 560
     pending = st.session_state.pop("_pending_question", None)
     # Frozen at send time (same run as ``st.toggle``, before ``st.chat_input``) — avoids reading
     # generate intent on the *pending* rerun before the toggle widget executes.
     pending_generate = st.session_state.pop("_pending_generate", None)
 
-    with st.container(height=_CHAT_SCROLL_PX):
-        for mi, msg in enumerate(st.session_state.messages):
+    # Adaptive height: small on a fresh chat, taller once there's history.
+    has_history = bool(messages) or pending is not None
+    chat_box_height = 540 if has_history else 150
+
+    with st.container(height=chat_box_height):
+        if not has_history:
+            st.caption(_lbl("empty_hint"))
+        for mi, msg in enumerate(messages):
             with st.chat_message(
                 msg["role"],
                 avatar=":material/person:" if msg["role"] == "user" else ":material/psychology:",
@@ -690,6 +777,9 @@ def _chat_body():
                         "tenant_id": st.session_state.get("tenant_id", "demo"),
                         "top_k": 5,
                         "generate": gen,
+                        # Prior turns (excluding the just-sent message) give the
+                        # backend multi-turn / clarification context.
+                        "prior_turns": _prior_turns(messages[:-1]),
                     }
                     rr = st.session_state.get("ui_reranker")
                     if rr:
@@ -707,14 +797,14 @@ def _chat_body():
 
                 try:
                     resp = run_with_progress(label, _query)
-                    _gal_suf = f"_p{len(st.session_state.messages)}"
+                    _gal_suf = f"_p{len(messages)}"
                     if not resp.get("answer_chunks"):
                         banner(t("no_results"), variant="warn", icon_name="search_off")
                     else:
                         if gen and not (resp.get("synthesized_answer") or "").strip():
                             banner(t("generation_fallback_warning"), variant="warn", icon_name="warning")
                         render_response(resp, gallery_key_suffix=_gal_suf)
-                    st.session_state.messages.append({
+                    messages.append({
                         "role": "assistant",
                         "content": "...",
                         "response": resp,
@@ -734,7 +824,10 @@ def _chat_body():
         )
 
     if prompt := st.chat_input(t("input_placeholder")):
-        st.session_state.messages.append({"role": "user", "content": prompt})
+        messages.append({"role": "user", "content": prompt})
+        # Name the conversation after its first question.
+        if conv["title"] == _lbl("chat_default_title") or not conv["title"]:
+            conv["title"] = (prompt[:38] + "…") if len(prompt) > 38 else prompt
         st.session_state["_pending_question"] = prompt
         st.session_state["_pending_generate"] = bool(
             st.session_state.get("chat_generate_toggle", True)
