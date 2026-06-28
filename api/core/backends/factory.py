@@ -26,9 +26,10 @@ def build_generation_backend(settings: Settings, model_cfg: GenerationModelConfi
     provider = model_cfg.provider
 
     if provider == "gemini":
-        # Env override (GEMINI_GENERATION_MODEL) wins as a global default;
-        # otherwise the catalog entry's model selects the specific Gemini model.
-        text_model = settings.gemini_generation_model.strip() or model_cfg.model
+        # The catalog entry's model is authoritative so per-id selection works
+        # (e.g. gemini-2.5-flash vs -flash-lite). Fall back to the env override
+        # only if a catalog entry somehow has no model.
+        text_model = model_cfg.model or settings.gemini_generation_model.strip()
         return GeminiBackend(
             api_key=settings.google_api_key,
             text_model=text_model,

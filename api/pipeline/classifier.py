@@ -74,11 +74,8 @@ _MODULE_PATTERN = re.compile(
     r"(?:m[oó]dulo|module)\s*[:\-]?\s*(\w[\w\s]{1,30})",
     re.IGNORECASE,
 )
-_ROBOT_KEYWORDS = {"robot", "rowa", "wwks", "dispensador automático",
-                   "apostore", "consis", "pharmathek", "tecnilab",
-                   "luse", "modicos", "fablox", "gollmann", "mach4",
-                   "meditech", "3ar", "apoteka", "vmotion", "label",
-                   "tecnyfarma", "pharmatrack", "movetec", "eonbox", "kls"}
+# Generic integration/automation keywords (override per domain as needed).
+_ROBOT_KEYWORDS = {"robot", "automation", "integration", "connector"}
 
 
 def classify_document(
@@ -197,21 +194,18 @@ def _extract_module(fname: str, sample: str) -> Optional[str]:
     m = _MODULE_PATTERN.search(sample)
     if m:
         return m.group(1).strip().lower()
-    for kw in ("rowa", "wwks", "dispensador", "apostore", "consis",
-               "pharmathek", "luse", "modicos", "vmotion", "3ar",
-               "cashfarma", "cashlogy", "paytef", "topii", "cismed",
-               "closeup", "farmapremium", "hanshow", "isdin", "sevem"):
+    for kw in ("integration", "connector", "automation", "api", "module", "robot"):
         if kw in fname or kw in sample:
             return kw
     return None
 
 
 def _detect_lang(text: str) -> str:
+    """Detect the document language (ISO 639-1, e.g. 'en', 'es', 'ca')."""
     try:
-        lang = detect(text)
-        return "ca" if lang == "ca" else "es"
+        return detect(text)
     except Exception:
-        return "es"
+        return "en"
 
 
 def _has_functional_content(sample: str) -> bool:

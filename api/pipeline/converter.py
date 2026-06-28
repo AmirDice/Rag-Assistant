@@ -17,6 +17,37 @@ from PIL import Image as PILImage
 
 logger = logging.getLogger(__name__)
 
+
+def _to_markdown(source, **kwargs) -> str:
+    """Convert a PDF to markdown via pymupdf4llm, with a safe fallback.
+
+    PyMuPDF 1.27's layout analysis (pymupdf.layout, ONNX) raises an int32/int64
+    InvalidArgument on some onnxruntime builds. If pymupdf4llm fails for any
+    reason we fall back to plain PyMuPDF text extraction so ingestion still
+    succeeds (loses some structure, keeps the content).
+    """
+    import pymupdf4llm
+
+    try:
+        return pymupdf4llm.to_markdown(str(source), **kwargs)
+    except Exception as exc:  # noqa: BLE001 - degrade gracefully on any backend error
+        logger.warning("pymupdf4llm failed (%s); using plain PyMuPDF text extraction", exc)
+        import pymupdf
+
+        pages = kwargs.get("pages")
+        doc = pymupdf.open(str(source))
+        try:
+            parts: list[str] = []
+            for i, page in enumerate(doc):
+                if pages is not None and i not in pages:
+                    continue
+                text = page.get_text("text").strip()
+                if text:
+                    parts.append(text)
+            return "\n\n".join(parts)
+        finally:
+            doc.close()
+
 _PICTURE_MARKER_RE = re.compile(
     r"\*?\*?\s*==>\s*picture\s*\[\d+\s*x\s*\d+\]\s*intentionally omitted\s*<==\s*\*?\*?",
     re.IGNORECASE,
@@ -41,15 +72,10 @@ _TOC_NOISE_RE = re.compile(
 )
 _REPEATED_WORDS_RE = re.compile(r"\b(\w{2,})\s+(?:\1\s+){2,}", re.IGNORECASE)
 _MULTI_SPACE_RE = re.compile(r"[ \t]{3,}")
-_HEADER_GARBLE_RE = re.compile(
-    r"^(?:Far\s*v?M?At?T?I?i?c|FazmaA?r?I?i?c|LARM[AI]ATIC|LARvMIATIC)\s*$",
-    re.MULTILINE | re.IGNORECASE,
-)
 
 
 def _clean_ocr_text(text: str) -> str:
     """Remove common OCR artifacts from pytesseract output."""
-    text = _HEADER_GARBLE_RE.sub("", text)
     text = _TOC_NOISE_RE.sub("", text)
     text = _REPEATED_CHARS_RE.sub(r"\1\1", text)
     text = _GARBLED_DOTS_RE.sub("...", text)
@@ -121,7 +147,7 @@ class PDFConverter:
             )
             md_text = self._hybrid_convert(source, set(sparse_pages))
         else:
-            md_text = pymupdf4llm.to_markdown(str(source))
+            md_text = _to_markdown(source)
 
         md_text = _clean_pymupdf_markers(md_text)
 
@@ -228,13 +254,13 @@ class PDFConverter:
             from PIL import Image
         except ImportError:
             logger.warning("pytesseract not available, using pymupdf4llm for all pages")
-            return pymupdf4llm.to_markdown(str(source))
+            return _to_markdown(source)
 
         native_page_list = sorted(
             i for i in range(pymupdf.open(str(source)).page_count)
             if i not in ocr_pages
         )
-        native_md = pymupdf4llm.to_markdown(str(source), pages=native_page_list) if native_page_list else ""
+        native_md = _to_markdown(source, pages=native_page_list) if native_page_list else ""
 
         ocr_parts: list[str] = []
         if ocr_pages:

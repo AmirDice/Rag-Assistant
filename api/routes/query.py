@@ -24,8 +24,8 @@ logger = logging.getLogger(__name__)
 
 # Shown in place of an ungrounded answer when the grounding guard trips.
 _GROUNDING_FALLBACK = (
-    "No tengo suficiente evidencia en la documentación recuperada para dar una "
-    "respuesta fiable. ¿Puedes concretar un poco más la consulta?"
+    "I don't have enough supporting evidence in the retrieved documentation to "
+    "give a reliable answer. Could you rephrase or add a bit more detail?"
 )
 
 

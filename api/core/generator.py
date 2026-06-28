@@ -35,31 +35,30 @@ class GeneratedAnswer:
     cost_breakdown: dict[str, Any] = field(default_factory=dict)
 
 
-def _system_prompt_es() -> str:
+def _system_prompt() -> str:
     p = product_labels()
     return (
-        f"Eres un asistente técnico experto en {p['short_name']}. "
-        f"{p['erp_context_es']} "
-        "Responde la pregunta del usuario basándote ÚNICAMENTE "
-        "en los fragmentos de documentación proporcionados.\n\n"
-        "Reglas:\n"
-        "- Responde en el mismo idioma que la pregunta del usuario.\n"
-        "- Cita las fuentes con [Fuente: nombre_documento, p.XX] cuando uses información "
-        "de un fragmento específico.\n"
-        "- Si la información no está en los fragmentos, di que no tienes esa información "
-        "en la documentación disponible.\n"
-        "- Sé conciso pero completo. Usa listas o pasos cuando sea apropiado.\n"
-        "- No inventes información que no esté en los fragmentos."
+        f"You are a technical assistant for {p['short_name']}. "
+        "Answer the user's question based ONLY on the provided documentation "
+        "excerpts.\n\n"
+        "Rules:\n"
+        "- Answer in the same language as the user's question.\n"
+        "- Cite sources as [Source: document_name, p.XX] when you use information "
+        "from a specific excerpt.\n"
+        "- If the information is not in the excerpts, say you do not have that "
+        "information in the available documentation.\n"
+        "- Be concise but complete. Use lists or steps when appropriate.\n"
+        "- Do not invent information that is not in the excerpts."
     )
 
 
 def _build_context(chunks: list[AnswerChunk]) -> str:
     parts: list[str] = []
     for i, chunk in enumerate(chunks, 1):
-        source = chunk.source_doc or "desconocido"
+        source = chunk.source_doc or "unknown"
         page = f", p.{chunk.source_page}" if chunk.source_page else ""
         section = f", §{chunk.source_section}" if chunk.source_section else ""
-        header = f"[Fragmento {i} — {source}{page}{section}]"
+        header = f"[Excerpt {i} — {source}{page}{section}]"
         parts.append(f"{header}\n{chunk.text}")
     return "\n\n---\n\n".join(parts)
 
@@ -88,10 +87,10 @@ async def generate_answer(
 
     context = _build_context(chunks)
     user_message = (
-        f"Fragmentos de documentación:\n\n{context}\n\n"
-        f"---\n\nPregunta del usuario: {question}"
+        f"Documentation excerpts:\n\n{context}\n\n"
+        f"---\n\nUser question: {question}"
     )
-    system_prompt = _system_prompt_es()
+    system_prompt = _system_prompt()
     model_cfg = generation_model_config(generation_model)
 
     try:
