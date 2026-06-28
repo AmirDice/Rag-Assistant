@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from api.routes import query, ingest, feedback, admin, benchmark, tenant, ui_config, calls, admin_glossary, admin_usage
+from api.routes import query, ingest, feedback, admin, benchmark, tenant, ui_config, calls, admin_glossary, admin_usage, jobs
 from api.core.cache import get_cache
 from api.core.settings import get_settings
 from api.core.security import InMemoryRateLimiter, require_admin_token
@@ -81,6 +81,7 @@ app.include_router(ui_config.router, tags=["config"], dependencies=[Depends(requ
 app.include_router(calls.router, tags=["calls"])
 app.include_router(admin_glossary.router, tags=["glossary"], dependencies=[Depends(require_admin_token)])
 app.include_router(admin_usage.router, tags=["usage"], dependencies=[Depends(require_admin_token)])
+app.include_router(jobs.router, tags=["jobs"])
 
 settings = get_settings()
 from pathlib import Path
@@ -92,6 +93,8 @@ app.mount("/corpus", StaticFiles(directory=str(_corpus)), name="corpus")
 @app.on_event("startup")
 async def startup():
     await get_cache()
+    from api.core.job_queue import get_job_queue
+    get_job_queue().start()
 
 
 @app.on_event("shutdown")
