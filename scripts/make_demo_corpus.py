@@ -11,9 +11,41 @@ from __future__ import annotations
 from pathlib import Path
 
 from fpdf import FPDF
+from PIL import Image, ImageDraw, ImageFont
 
 OUT = Path(__file__).resolve().parent.parent / "demo_docs"
 OUT.mkdir(parents=True, exist_ok=True)
+
+
+def _font(size: int):
+    for name in ("arial.ttf", "Arial.ttf", "DejaVuSans.ttf"):
+        try:
+            return ImageFont.truetype(name, size)
+        except Exception:
+            continue
+    return ImageFont.load_default()
+
+
+def make_share_dialog_image() -> Path:
+    """Render a simple mock 'Share' dialog so a demo doc has an embedded image
+    (exercises the image extraction + vision-captioning pipeline)."""
+    img = Image.new("RGB", (660, 380), "#eef1f7")
+    d = ImageDraw.Draw(img)
+    d.rectangle([0, 0, 660, 52], fill="#34507e")
+    d.text((18, 17), "Acme Cloud  -  Share \"Q4-plan.pdf\"", fill="white", font=_font(18))
+    d.text((24, 80), "Invite people by email", fill="#222", font=_font(15))
+    d.rectangle([24, 110, 470, 146], outline="#9aa6c2", fill="white")
+    d.text((34, 119), "alex@example.com", fill="#444", font=_font(14))
+    d.rectangle([486, 110, 636, 146], outline="#9aa6c2", fill="white")
+    d.text((496, 119), "Can edit  v", fill="#444", font=_font(14))
+    d.text((24, 178), "Or copy a link", fill="#222", font=_font(15))
+    d.rectangle([24, 208, 636, 244], outline="#9aa6c2", fill="white")
+    d.text((34, 217), "https://acme.cloud/s/9fA2qZ   (view only)", fill="#3357a8", font=_font(14))
+    d.rectangle([512, 312, 636, 352], fill="#3b6cf6")
+    d.text((545, 323), "Share", fill="white", font=_font(15))
+    p = OUT / "_share_dialog.png"
+    img.save(p)
+    return p
 
 
 class Doc(FPDF):
@@ -43,6 +75,12 @@ class Doc(FPDF):
             self._block(f"{i}. {it}", 6)
         self.ln(1)
 
+    def img(self, path, w: float = 150) -> None:
+        self.ln(2)
+        self.set_x(self.l_margin)
+        self.image(str(path), w=w)
+        self.ln(2)
+
 
 def build(filename: str, title: str, blocks: list) -> None:
     pdf = Doc()
@@ -56,6 +94,10 @@ def build(filename: str, title: str, blocks: list) -> None:
             pdf.para(payload)
         elif kind == "steps":
             pdf.steps(payload)
+        elif kind == "img":
+            pdf.img(payload)
+        elif kind == "pagebreak":
+            pdf.add_page()
     pdf.output(str(OUT / filename))
     print("wrote", OUT / filename)
 
@@ -154,5 +196,28 @@ build(
         ("p", "Q: Does Acme Cloud support single sign-on? A: Yes, SAML and OIDC SSO are available on the Business plan."),
     ],
 )
+
+# A doc with an embedded image — exercises image extraction + vision captioning,
+# so the corpus has chunks that contain a figure (visible on the Images page).
+_share_img = make_share_dialog_image()
+build(
+    "acme_cloud_visual_guide.pdf",
+    "Acme Cloud - Visual Guide: Sharing",
+    [
+        ("p", "This visual guide shows the Share dialog used to share a file with people "
+              "or via a link. Select a file and click Share to open it."),
+        ("p", "The Share dialog lets you invite people by email with a permission level "
+              "(view-only or edit), or copy a link. The screenshot below shows the dialog:"),
+        ("pagebreak", None),
+        ("p", "Figure 1 - The Acme Cloud Share dialog:"),
+        ("img", _share_img),
+        ("p", "Set the email permission to 'Can edit' to let collaborators change the file, "
+              "or copy the view-only link to share read access. Links can require sign-in or expire."),
+    ],
+)
+try:
+    _share_img.unlink()
+except Exception:
+    pass
 
 print("done")
