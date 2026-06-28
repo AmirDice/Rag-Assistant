@@ -1,3 +1,35 @@
+# RAG Assistant
+
+Retrieval-augmented Q&A over your documents — a FastAPI backend + Streamlit UI with
+provider-agnostic generation, a post-generation grounding check, glossary-aware query
+preprocessing, and built-in cost/usage tracking.
+
+## Features
+
+- **Grounded answers with citations** — embed → vector search → rerank → generate, with a
+  post-generation *grounding guard* that flags answers not supported by the retrieved sources.
+- **Provider-agnostic generation** — Gemini / OpenAI-compatible / Ollama behind one factory,
+  selectable per query, with per-call token-usage accounting.
+- **Query understanding** — glossary-aware preprocessing (alias → canonical + recall expansion)
+  and an optional intent planner that asks a clarifying question when a query is ambiguous.
+- **Cost & usage dashboard** — every generation is priced from token usage; see per-model spend,
+  tokens, and a daily trend.
+- **Editable glossary**, **multi-format ingestion** (PDF / DOCX / PPTX / XLSX), **multi-tenant**
+  filtering, **feedback** capture, and a **benchmark** harness.
+
+## Screenshots
+
+**Chat — grounded answer with citations**
+
+![Chat](assets/screenshots/chat.png)
+
+| Usage &amp; cost dashboard | Glossary admin |
+| --- | --- |
+| ![Usage and cost](assets/screenshots/usage.png) | ![Glossary](assets/screenshots/glossary.png) |
+
+> The bundled demo corpus is **generic, synthetic** "Acme Cloud" product docs
+> (`demo_docs/`, regenerate with `python scripts/make_demo_corpus.py`) — no real data.
+
 ## Quick Start
 
 ```bash

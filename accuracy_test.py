@@ -8,56 +8,47 @@ API = "http://localhost:8000"
 # Each test: (query, primary_expected_doc_substring, acceptable_alternatives)
 # primary = the MOST specific doc that should answer this
 # alternatives = general-purpose docs that also validly answer it
+# Generic test set for the bundled Acme Cloud demo corpus (see demo_docs/).
 TESTS = [
     (
-        "¿Cómo activo el Libro Veterinario en Farmatic?",
-        "Libro Veterinario",
-        ["Operaciones Frecuentes"],
+        "How do I sign in with single sign-on?",
+        "getting_started",
+        ["admin_security"],
     ),
     (
-        "¿Cómo configuro el cajón CashFarma en Farmatic?",
-        "CashFarma",
-        ["Cambios CashFarma"],
-    ),
-    (
-        "¿Qué es Verifactu y cómo se activa en Farmatic?",
-        "VeriFactu",
-        ["FAQ_VeriFactu"],
-    ),
-    (
-        "¿Cómo se trabaja con monodosis en Farmatic?",
-        "MONODOSIS",
+        "How do I enable two-factor authentication for my team?",
+        "admin_security",
         [],
     ),
     (
-        "¿Cómo se envían pedidos por Fedicom v3?",
-        "Fedicom_v3",
-        ["CINFA_Fedicom", "Cofarle_Fedicom", "Hefame"],
-    ),
-    (
-        "¿Cómo inicializar el libro electrónico de estupefacientes en Madrid?",
-        "Libro_Estupefacientes_Madrid",
+        "How do I upgrade my plan?",
+        "billing",
         [],
     ),
     (
-        "¿Cómo se configura el medio de pago con PINPAD?",
-        "MediosPago_PINPAD",
-        ["PAYTEF", "Cambios_MediosPago"],
+        "Why did my file upload fail?",
+        "troubleshooting",
+        [],
     ),
     (
-        "¿Cómo dar de alta un vendedor en Farmatic?",
-        "Operaciones Frecuentes",
-        ["Primeras_Horas"],
+        "How do I create an API key?",
+        "admin_security",
+        ["troubleshooting"],
     ),
     (
-        "¿Cómo funciona el robot ROWA con Farmatic?",
-        "ROWA_WWKS2",
-        ["CambiosRowaWWKS2"],
+        "How do I share a file with someone outside my team?",
+        "getting_started",
+        [],
     ),
     (
-        "¿Cómo se gestiona la firma digital con Wacom en Farmatic?",
-        "Asistente_Firma_WacomSTU_430",
-        ["Asistente_Firma_Evolis"],
+        "What plans are available and what do they include?",
+        "billing",
+        [],
+    ),
+    (
+        "How do I recover a deleted file?",
+        "troubleshooting",
+        [],
     ),
 ]
 

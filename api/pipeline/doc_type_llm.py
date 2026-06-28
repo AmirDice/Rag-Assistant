@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 _MIN_TEXT_CHARS = 40
 
-_CLASSIFICATION_PROMPT = """You classify documentation for a pharmacy ERP (Farmatic / similar).
+_CLASSIFICATION_PROMPT = """You classify product / software documentation.
 
 From the FILE NAME and the TEXT SAMPLE, pick exactly ONE type_id from this list (copy the id string exactly):
 - structured_manual — comprehensive user manual with chapters or table of contents

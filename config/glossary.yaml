@@ -1,8 +1,8 @@
 # Domain glossary — seed data loaded into SQLite on first startup.
 #
 # Purpose
-#   • Fix domain-specific typos/variants that a generic spell-checker never
-#     catches (ERP acronyms, product-line names, Spanish pharmacy terms).
+#   • Fix domain-specific typos/variants a generic spell-checker never catches
+#     (acronyms, product terms).
 #   • Enrich short / shorthand queries with canonical terms so retrieval
 #     (dense + sparse) has the right tokens to match.
 #
@@ -10,99 +10,58 @@
 #   • The glossary is editable from the UI / admin API. Edits in the DB
 #     override this file.
 #   • `term`        → canonical form written into the enriched query.
-#   • `aliases`     → variants/typos that, when detected, get replaced
-#                      by `term` (case-insensitive, accent-insensitive,
-#                      whole-word match).
-#   • `expansion`   → optional extra tokens appended to the enriched query
-#                      to widen lexical recall (sparse BM25).
+#   • `aliases`     → variants/typos that, when detected, get replaced by
+#                      `term` (case-insensitive, accent-insensitive, whole-word).
+#   • `expansion`   → optional extra tokens appended to widen lexical recall.
 #   • `description` → human-readable note shown in admin UI; never sent to LLM.
 #
-# IMPORTANT
-#   Keep entries short and specific. Broad synonyms here will degrade
-#   precision on high-quality queries.
+# These are generic terms for the bundled Acme Cloud demo corpus — replace with
+# your own domain terms for a real deployment.
 
 version: 1
 
 entries:
-  - term: "HCP"
-    aliases: ["hcp", "h.c.p.", "h c p", "hoja cupon precinto", "hoja cupón precinto", "hojas cupon precinto"]
-    expansion: "hoja cupón precinto"
-    description: "Hoja Cupón Precinto (facturación MUFACE / receta electrónica)."
+  - term: "SSO"
+    aliases: ["sso", "single sign on", "single sign-on", "sso login"]
+    expansion: "single sign-on authentication SAML OIDC"
+    description: "Single sign-on login via SAML or OIDC."
 
-  - term: "SEVeM"
-    aliases: ["sevem", "se vem", "alerta sevem", "alertas sevem", "alerta medicamento"]
-    expansion: "sistema español verificación medicamentos"
-    description: "Sistema Español de Verificación de Medicamentos."
+  - term: "2FA"
+    aliases: ["2fa", "two factor", "two-factor", "2 factor authentication", "mfa", "multi factor"]
+    expansion: "two-factor authentication authenticator"
+    description: "Two-factor / multi-factor authentication."
 
-  - term: "ABCD"
-    aliases: ["abcd", "a.b.c.d.", "a b c d", "clasificacion abcd", "clasificación abcd"]
-    expansion: "clasificación ABCD artículos"
-    description: "Clasificación ABCD de artículos por rotación de stock."
+  - term: "ACL"
+    aliases: ["acl", "access control list", "permissions list", "file permissions"]
+    expansion: "access control list permissions"
+    description: "Per-file / per-folder access control list."
 
-  - term: "SISCATA"
-    aliases: ["siscata", "sis cata", "sistema siscata", "alerta siscata"]
-    expansion: "sistema información stocks cataluña"
-    description: "Sistema de información de stocks de Cataluña (CatSalut)."
+  - term: "workspace"
+    aliases: ["workspace", "work space", "team workspace"]
+    expansion: "team workspace members"
+    description: "A team's space for files and members."
 
-  - term: "MUFACE"
-    aliases: ["muface", "mu face", "muface hcp", "receta muface", "recetas muface"]
-    expansion: "receta MUFACE facturación HCP"
-    description: "Mutualidad de Funcionarios Civiles del Estado — facturación HCP."
+  - term: "shared drive"
+    aliases: ["shared drive", "shared folder", "team drive"]
+    expansion: "shared drive team folder"
+    description: "A drive shared across a whole team."
 
-  - term: "Nodofarma"
-    aliases: ["nodofarma", "nodo farma", "nofarma", "no do farma", "node farma", "nodofarma venta", "nodofarma dispensacion", "nodofarma dispensación"]
-    expansion: "receta electrónica Nodofarma"
-    description: "Plataforma de receta electrónica del Consejo General."
+  - term: "API key"
+    aliases: ["api key", "api token", "access token", "developer key"]
+    expansion: "API key developer token"
+    description: "Secret key used to call the API."
 
-  - term: "cartera"
-    aliases: ["cartera", "carteras", "mi cartera", "una cartera", "crear cartera"]
-    expansion: "cartera de compras PVF optimización"
-    description: "Cartera de compras optimizada por PVF (precio venta farmacia)."
+  - term: "webhook"
+    aliases: ["webhook", "web hook", "callback url"]
+    expansion: "webhook callback notification event"
+    description: "HTTP callback fired on file events."
 
-  - term: "lista de caducidades"
-    aliases: ["lista caducidades", "listado caducidades", "listado de caducidades", "caducidades articulos", "lista caduca"]
-    expansion: "lista de caducidades de artículos caducados próximos"
-    description: "Listado de artículos por fecha de caducidad."
+  - term: "retention policy"
+    aliases: ["retention policy", "data retention", "retention rule"]
+    expansion: "data retention policy auto delete"
+    description: "Rule for automatically deleting old data."
 
-  - term: "cambio de ejercicio"
-    aliases: ["cambio ejercicio", "cambio de ejercicio", "cambio año fiscal", "cierre ejercicio", "cierre de ejercicio"]
-    expansion: "cierre de ejercicio fiscal anual"
-    description: "Proceso de cierre/apertura de ejercicio contable anual."
-
-  - term: "receta electrónica"
-    aliases: ["receta electronica", "recetas electronicas", "receta e", "e-receta", "receta digital"]
-    expansion: "receta electrónica dispensación"
-    description: "Sistema nacional de receta electrónica."
-
-  - term: "encargo"
-    aliases: ["encargo", "encargos", "enargo", "pedido cliente", "hacer encargo", "nuevo encargo"]
-    expansion: "encargo de cliente pedido"
-    description: "Encargo de cliente (apartar artículo pendiente de recibir)."
-
-  - term: "libro de estupefacientes"
-    aliases: ["libro estupefacientes", "estupefacientes", "estupefadientes", "libro psicotropos", "notificar estupefacientes"]
-    expansion: "libro de estupefacientes notificación electrónica"
-    description: "Libro oficial de estupefacientes y psicótropos."
-
-  - term: "CashFarma"
-    aliases: ["cashfarma", "cash farma", "cashlogy", "cash logy", "caja inteligente"]
-    expansion: "CashFarma caja inteligente CashLogy"
-    description: "Integración con caja inteligente CashLogy / CashFarma."
-
-  - term: "protocolo de comunicación"
-    aliases: ["protocolo comunicacion", "protocolo comunicación", "protocolo de comunicacion", "protocolo f3", "protocolo pedidos"]
-    expansion: "protocolo de comunicación pedidos F3"
-    description: "Protocolo de comunicación con proveedores (F3)."
-
-  - term: "Farmasoft"
-    aliases:
-      - "farmasoft"
-      - "farmaso"
-      - "farma soft"
-      - "farmatic"
-      - "armasoft"
-      - "arma soft"
-      - "pharmasoft"
-      - "pharma soft"
-    expansion: "Farmasoft ERP soporte farmacéutico"
-    description: "Marca del producto — corrección de errores frecuentes de ASR en llamadas."
+  - term: "audit log"
+    aliases: ["audit log", "audit trail", "activity log"]
+    expansion: "audit log activity trail compliance"
+    description: "Record of sign-ins and security-relevant activity."

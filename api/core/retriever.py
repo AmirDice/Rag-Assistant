@@ -206,7 +206,7 @@ def _normalize(text: str) -> str:
 
 
 def _doc_stem(source_doc: str) -> str:
-    """'CashFarma.pdf' → 'cashfarma'"""
+    """'UserGuide.pdf' → 'userguide'"""
     stem = source_doc.rsplit(".", 1)[0] if "." in source_doc else source_doc
     return _normalize(stem)
 

@@ -24,7 +24,7 @@ def test_minimal_tenant_robot_filter_only():
 def test_contracted_modules_uses_min_should():
     f = _build_tenant_filter(
         {
-            "contracted_modules": ["rowa"],
+            "contracted_modules": ["robotics"],
             "has_robot_integration": True,
         }
     )
@@ -83,8 +83,8 @@ def test_include_changelog_pure(payload: dict, tv: float | None, expect: bool):
 
 
 def test_payload_visible_module_contract():
-    tenant = {"contracted_modules": ["rowa"], "has_robot_integration": True}
-    assert payload_visible_for_tenant({"module_id": "rowa", "doc_type": "x"}, tenant)
+    tenant = {"contracted_modules": ["robotics"], "has_robot_integration": True}
+    assert payload_visible_for_tenant({"module_id": "robotics", "doc_type": "x"}, tenant)
     assert payload_visible_for_tenant({"module_id": "", "doc_type": "x"}, tenant)
     assert payload_visible_for_tenant({"doc_type": "x"}, tenant)
     assert not payload_visible_for_tenant({"module_id": "other", "doc_type": "x"}, tenant)

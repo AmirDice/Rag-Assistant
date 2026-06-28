@@ -18,7 +18,7 @@ def test_merged_overlay_overrides_yaml(monkeypatch: pytest.MonkeyPatch):
                 "tenants": {
                     "demo": {
                         "erp_version": 1.0,
-                        "contracted_modules": ["rowa"],
+                        "contracted_modules": ["robotics"],
                         "has_robot_integration": True,
                     }
                 }
@@ -27,7 +27,7 @@ def test_merged_overlay_overrides_yaml(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(ts, "get_settings", lambda: S())
     m = ts.merged_tenant_config("demo")
     assert m["erp_version"] == 99.0
-    assert m["contracted_modules"] == ["rowa"]
+    assert m["contracted_modules"] == ["robotics"]
 
 
 def test_normalize_onboarding_legacy_erp_to_erp():

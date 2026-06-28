@@ -62,7 +62,7 @@ def _onboarding_body():
 
     with st.form("onboarding_form"):
         erp_s = st.text_input("erp_version (optional)", placeholder="5.0")
-        mods = st.text_input(t("onboarding_modules"), placeholder="rowa, dispensador")
+        mods = st.text_input(t("onboarding_modules"), placeholder="robotics, integrations")
         robot = st.checkbox("has_robot_integration", value=False)
         pref = st.selectbox("preferred_lang", ["es", "ca"], index=0)
         bench = st.selectbox("benchmark_lang", ["es", "ca"], index=0)

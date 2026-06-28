@@ -216,3 +216,6 @@ qdrant_data/
 redis_data/
 notes.txt
 *.docx
+
+# Generated demo ingest artifacts
+demo_corpus/

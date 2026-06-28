@@ -62,7 +62,7 @@ def test_tenant_entry_listed_for_tenant(isolated_glossary):
     terms = {e.term for e in list_entries(tenant_id="acme")}
     assert "solo-acme" in terms
     # Global YAML seed is also visible to the tenant.
-    assert "HCP" in terms
+    assert "SSO" in terms
 
 
 def test_fingerprint_changes_on_create(isolated_glossary):
