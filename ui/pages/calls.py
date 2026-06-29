@@ -14,9 +14,7 @@ from progress_helpers import run_with_progress
 from ui_style import banner, page_heading, section_header
 
 API_URL = os.getenv("API_URL", "http://localhost:8000")
-_DEMO_CALLS_TOTAL = 184
-_DEMO_CALLS_RESOLVED = 149
-_DEMO_LAST_INDEXED = "2026-04-26 22:40"
+_DEMO_LAST_INDEXED = "—"
 
 
 def _demo_call_rows() -> list[dict[str, Any]]:
@@ -24,26 +22,26 @@ def _demo_call_rows() -> list[dict[str, Any]]:
         {
             "id": "demo-001",
             "call_id": "CALL-001",
-            "farmacia": "Farmacia Central",
+            "farmacia": "Northwind Traders",
             "resolved": True,
             "indexed_at": "2026-04-26T22:38:14",
-            "source": "llamada_urgencias_01.mp3",
+            "source": "acme_support_sso_setup.mp3",
         },
         {
             "id": "demo-002",
             "call_id": "CALL-002",
-            "farmacia": "Farmacia Norte",
+            "farmacia": "Globex Inc.",
             "resolved": False,
             "indexed_at": "2026-04-26T22:31:02",
-            "source": "consulta_stock_02.wav",
+            "source": "acme_support_upload_fail.mp3",
         },
         {
             "id": "demo-003",
             "call_id": "CALL-003",
-            "farmacia": "Farmacia San Miguel",
+            "farmacia": "Initech",
             "resolved": True,
             "indexed_at": "2026-04-26T22:27:58",
-            "source": "incidencia_ticket_03.m4a",
+            "source": "acme_support_billing_plan.mp3",
         },
     ]
 
@@ -51,26 +49,26 @@ def _demo_call_rows() -> list[dict[str, Any]]:
 def _demo_call_detail(selected_id: str) -> dict[str, Any]:
     return {
         "id": selected_id,
-        "problema_corto": "Error intermitente al validar receta electrónica durante hora punta.",
-        "resumen": "La farmacia reporta rechazos temporales en validación; se verificó conexión y configuración.",
-        "resolucion": "Se aplicó ajuste de reintento y sincronización de estado, quedando estable.",
+        "problema_corto": "Single sign-on fails for all members after enabling SAML.",
+        "resumen": "Customer enabled SAML SSO but members could not sign in; the email attribute was unmapped.",
+        "resolucion": "Mapped the email and name attributes in Admin Settings > SSO and set a default role; sign-in worked.",
         "audio_available": False,
         "transcript": [
-            {"start": 0.0, "end": 7.2, "speaker": "AGENTE", "text": "Buenos días, ¿en qué podemos ayudarle?"},
-            {"start": 7.3, "end": 19.8, "speaker": "CLIENTE", "text": "Tenemos cortes en receta electrónica desde las 9:30."},
-            {"start": 20.0, "end": 33.1, "speaker": "AGENTE", "text": "Vamos a revisar conectividad y estado de servicios en vivo."},
+            {"start": 0.0, "end": 7.2, "speaker": "AGENT", "text": "Hi, how can we help today?"},
+            {"start": 7.3, "end": 19.8, "speaker": "CALLER", "text": "I enabled single sign-on and now my team can't log in."},
+            {"start": 20.0, "end": 33.1, "speaker": "AGENT", "text": "Let's check the SSO attribute mapping in Admin Settings."},
         ],
         "rag_qa": [
             {
-                "question": "¿Cuál fue el síntoma principal?",
-                "answer": "Rechazos intermitentes en validación de receta electrónica.",
-                "category": "incidencia",
+                "question": "What was the main symptom?",
+                "answer": "Members were redirected back with an error and could not sign in via SSO.",
+                "category": "authentication",
                 "confidence": 0.91,
             },
             {
-                "question": "¿Qué acción resolvió el problema?",
-                "answer": "Ajuste de reintentos y sincronización del servicio.",
-                "category": "resolucion",
+                "question": "What action resolved the problem?",
+                "answer": "Mapping the email/name attributes and setting a default role in Admin Settings > SSO.",
+                "category": "resolution",
                 "confidence": 0.88,
             },
         ],
@@ -201,8 +199,8 @@ calls_payload = bundle.get("calls") or {}
 calls = calls_payload.get("calls") or []
 
 s1, s2, s3 = st.columns(3)
-s1.metric(t("calls_metric_total"), max(int(stats.get("total", 0) or 0), _DEMO_CALLS_TOTAL))
-s2.metric(t("calls_metric_resolved"), max(int(stats.get("resolved", 0) or 0), _DEMO_CALLS_RESOLVED))
+s1.metric(t("calls_metric_total"), int(stats.get("total", 0) or 0))
+s2.metric(t("calls_metric_resolved"), int(stats.get("resolved", 0) or 0))
 s3.metric(
     t("calls_metric_last"),
     ((stats.get("last_indexed_at") or "")[:19] or _DEMO_LAST_INDEXED),
@@ -215,7 +213,7 @@ rows = [
     {
         "id": c.get("id"),
         "call_id": c.get("call_id"),
-        "farmacia": c.get("farmacia"),
+        "customer": c.get("farmacia"),
         "resolved": bool(c.get("resolucion_exitosa")),
         "indexed_at": c.get("indexed_at"),
         "source": c.get("source_file"),
@@ -227,7 +225,7 @@ st.dataframe(rows, use_container_width=True, hide_index=True)
 selected_id = st.selectbox(
     t("calls_pick"),
     options=[r["id"] for r in rows],
-    format_func=lambda x: next((f"{r['call_id']} - {r['farmacia'] or 'N/A'}" for r in rows if r["id"] == x), x),
+    format_func=lambda x: next((f"{r['call_id']} - {r['customer'] or 'N/A'}" for r in rows if r["id"] == x), x),
 )
 
 is_demo = selected_id.startswith("demo-")

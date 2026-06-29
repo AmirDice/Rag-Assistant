@@ -219,3 +219,6 @@ notes.txt
 
 # Generated demo ingest artifacts
 demo_corpus/
+
+# Seeded/processed audio-call output (regenerate via scripts/seed_demo_calls.py)
+modules/audio_pipeline/output/

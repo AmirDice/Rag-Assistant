@@ -12,9 +12,6 @@ from progress_helpers import run_with_progress
 from ui_style import banner, clean_source_display_name, page_heading, section_header, status_cards
 
 API_URL = os.getenv("API_URL", "http://localhost:8000")
-_DEMO_DOCS_PLACEHOLDER = 860
-_DEMO_CHUNKS_PLACEHOLDER = 12480
-_DEMO_SIZE_MB_PLACEHOLDER = 1024.00
 
 
 def _fmt_mb(num_bytes: Any) -> str:
@@ -180,14 +177,11 @@ def _corpus_body():
         ingest_state_kind = "neutral"
 
     last = stats.get("last_ingestion")
-    total_docs_real = int(stats.get("total_docs", 0) or 0)
-    total_docs = max(total_docs_real, _DEMO_DOCS_PLACEHOLDER)
+    total_docs = int(stats.get("total_docs", 0) or 0)
     total_chunks_stats = int(stats.get("total_chunks", 0) or 0)
-    total_chunks_real = total_chunks_stats if total_chunks_stats > 0 else int(ingest_status.get("chunks_created", 0) or 0)
-    total_chunks = max(total_chunks_real, _DEMO_CHUNKS_PLACEHOLDER)
+    total_chunks = total_chunks_stats if total_chunks_stats > 0 else int(ingest_status.get("chunks_created", 0) or 0)
     total_size_bytes = int(stats.get("total_docs_bytes", 0) or 0)
-    total_size_mb_real = float(total_size_bytes) / (1024.0 * 1024.0)
-    total_size_mb = max(total_size_mb_real, _DEMO_SIZE_MB_PLACEHOLDER)
+    total_size_mb = float(total_size_bytes) / (1024.0 * 1024.0)
 
     status_cards(
         [

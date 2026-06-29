@@ -136,7 +136,7 @@ async def get_collection_stats() -> dict:
             iv = getattr(info, "indexed_vectors_count", None)
             if iv is not None:
                 total = int(iv or 0)
-        vc = info.vectors_count
+        vc = getattr(info, "vectors_count", None)
         if (vc is None or vc == 0) and total:
             vc = total
         return {

@@ -27,6 +27,8 @@ usage/cost dashboard.
 | Usage &amp; cost dashboard | Glossary admin | Extracted figures (image chunks) |
 | --- | --- | --- |
 | ![Usage and cost](assets/screenshots/usage.png) | ![Glossary](assets/screenshots/glossary.png) | ![Image gallery](assets/screenshots/images.png) |
+| Corpus &amp; ingestion | Audio-call analysis |  |
+| ![Corpus](assets/screenshots/corpus.png) | ![Calls](assets/screenshots/calls.png) |  |
 
 > The bundled demo corpus is **generic, synthetic** "Acme Cloud" product docs
 > (`demo_docs/`, regenerate with `python scripts/make_demo_corpus.py`) — no real data.
